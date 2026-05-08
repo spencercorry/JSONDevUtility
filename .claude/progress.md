@@ -76,11 +76,20 @@
 - `JsonStateService` wired — `TypescriptGeneratorService` injected, `generate('typescript', ...)` routed to it
 - `ng build` passes cleanly ✓
 
-### Phase 6 — Pydantic Generator
-- [ ] Create `src/app/services/pydantic-generator.service.ts`
-- [ ] v1: `BaseModel` + `Optional`, `List`, `Union`
-- [ ] v2: adds `model_config = ConfigDict(strict=True)`
-- [ ] Integer vs float detection via `Number.isInteger()`
+### Phase 6 — Pydantic Generator — 2026-05-08
+- `src/app/services/pydantic-generator.service.ts` created
+  - Classes emitted in dependency-first order (children before parents) — required for Python forward references
+  - v1: `from pydantic import BaseModel`; v2: adds `ConfigDict`, emits `model_config = ConfigDict(strict=True)` as first field
+  - Type mappings: `str`, `int`, `float`, `bool`, `List[X]`, `Optional[X]`, `Union[...]`, `Any`
+  - `primitiveType: 'integer'` → `int`; `'float'` → `float`; `'number'` → `float` (safe default)
+  - Null fields → `Optional[str/float/bool/Union[str, float, bool]]` + `= None` default
+  - `combination` null type → `Optional[Union[str, float, bool]]`
+  - Dynamic imports — only emits `from typing import ...` for types actually used
+  - Root array → type alias `RootName = List[ItemType]`; item class emitted above it
+  - Field name sanitization: hyphens → underscores, leading digits prefixed `_`
+  - try/catch → `# Generation error: ...`
+- `JsonStateService` wired — `PydanticGeneratorService` injected, `generate('pydantic', ...)` routed
+- `ng build` passes cleanly ✓
 
 ### Phase 7 — JS Object Generator
 - [ ] Create `src/app/services/js-object-generator.service.ts`

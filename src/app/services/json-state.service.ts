@@ -7,6 +7,7 @@ import {
   SchemaNode,
 } from '../models/generation-config.model';
 import { buildSchemaTree } from '../utils/json-parser.util';
+import { PydanticGeneratorService } from './pydantic-generator.service';
 import { TypescriptGeneratorService } from './typescript-generator.service';
 
 @Injectable({ providedIn: 'root' })
@@ -42,6 +43,7 @@ export class JsonStateService {
   });
 
   private readonly tsGenerator = inject(TypescriptGeneratorService);
+  private readonly pyGenerator = inject(PydanticGeneratorService);
 
   constructor() {
     effect(() => {
@@ -67,7 +69,7 @@ export class JsonStateService {
   private generate(tab: OutputTab, tree: SchemaNode, config: GenerationConfig): string {
     switch (tab) {
       case 'typescript': return this.tsGenerator.generate(tree, config);
-      case 'pydantic':   return '# Pydantic generation coming soon';
+      case 'pydantic':   return this.pyGenerator.generate(tree, config);
       case 'jsObject':   return '// JS Object generation coming soon';
     }
   }
