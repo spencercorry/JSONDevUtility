@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:gh-pages": "ng build --base-href /REPO-NAME/ && node -e \"const fs=require('fs');fs.copyFileSync('dist/jsonapp/browser/index.html','dist/jsonapp/browser/404.html')\"",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
