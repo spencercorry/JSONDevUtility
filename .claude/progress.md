@@ -21,25 +21,31 @@
 - `CLAUDE.md` initialized — commands, architecture overview, data contracts, styling rules
 - `ng build` passes cleanly ✓
 
+### Phase 2 — Monaco Integration & Left Pane — 2026-05-08
+- Upgraded Angular 20 → 21.2 (required for ngx-monaco-editor-v2 compatibility)
+- `ngx-monaco-editor-v2` installed
+- Monaco worker assets added to `angular.json`
+- `src/app/utils/monaco-theme.util.ts` created — `utilityDark` custom theme
+- `src/app/components/left-pane/` created — Monaco JSON editor, Beautify + Submit buttons
+- `src/app/services/json-state.service.ts` created — minimal `rawJson` + `isValid` signals
+- `AppComponent` updated — 50/50 CSS Grid layout, right pane placeholder
+- `provideMonacoEditor()` added to `app.config.ts`
+- `ng build` passes cleanly ✓
+
+---
+
+### Phase 3 — JsonStateService & Signal Graph — 2026-05-08
+- `src/app/models/generation-config.model.ts` created — `NullType`, `PydanticVersion`, `NullMode`, `OutputTab`, `SchemaKind`, `GenerationConfig`, `SchemaNode`, `OutputCache`, `ParseResult`
+- `src/app/services/json-state.service.ts` expanded — full signal graph wired
+  - Writable: `rawJson`, `generationConfig`, `activeTab`, `outputCache`
+  - Computed: `parseResult` (try/catch JSON.parse with SyntaxError message), `isValid`, `errorMsg`, `schemaTree` (stubbed — returns null until Phase 4)
+  - `applyConfig()` — nulls cache, sets new config
+  - `effect()` — reads `activeTab`/`schemaTree`/`generationConfig`; skips if cache hit; calls stubbed `generate()` method
+- `ng build` passes cleanly ✓
+
 ---
 
 ## TODO — Next Steps
-
-### Phase 2 — Monaco Integration & Left Pane
-- [ ] Install `ngx-monaco-editor-v2`
-- [ ] Add Monaco worker assets to `angular.json` assets array
-- [ ] Create `src/app/utils/monaco-theme.util.ts` — register `utilityDark` theme
-- [ ] Create `src/app/components/left-pane/` component
-- [ ] Wire Monaco editor: JSON language, `utilityDark` theme, `automaticLayout`, `formatOnPaste`
-- [ ] Implement Beautify button (format in-place, snackbar on invalid)
-- [ ] Implement Submit button (disabled when invalid, opens modal placeholder for now)
-
-### Phase 3 — JsonStateService & Signal Graph
-- [ ] Create `src/app/services/json-state.service.ts`
-- [ ] Writable signals: `rawJson`, `generationConfig`, `activeTab`, `outputCache`
-- [ ] Computed signals: `parseResult`, `isValid`, `errorMsg`, `schemaTree`
-- [ ] `applyConfig()` method — nulls output cache, sets new config
-- [ ] `effect()` for lazy tab output generation
 
 ### Phase 4 — Schema Parser Utilities
 - [ ] Create `src/app/utils/json-parser.util.ts` — recursive `buildSchemaTree()`
