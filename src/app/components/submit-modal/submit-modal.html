@@ -1,0 +1,66 @@
+<h2 mat-dialog-title>Configure Output</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="modal-form">
+
+    <mat-form-field appearance="outline">
+      <mat-label>Root Type Name</mat-label>
+      <input matInput formControlName="rootTypeName" placeholder="e.g. User" />
+      @if (form.controls.rootTypeName.invalid && form.controls.rootTypeName.touched) {
+        <mat-error>Type name is required</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="toggle-row">
+      <span class="toggle-label">Pydantic Version</span>
+      <mat-button-toggle-group formControlName="pydanticVersion">
+        <mat-button-toggle value="v1">v1</mat-button-toggle>
+        <mat-button-toggle value="v2">v2</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-label">Null Handling</span>
+      <mat-button-toggle-group formControlName="nullMode">
+        <mat-button-toggle value="global">Global</mat-button-toggle>
+        <mat-button-toggle value="per-field">Per Field</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    @if (isGlobal) {
+      <mat-form-field appearance="outline">
+        <mat-label>Null Type</mat-label>
+        <mat-select formControlName="globalNullType">
+          <mat-option value="string">string | null</mat-option>
+          <mat-option value="number">number | null</mat-option>
+          <mat-option value="boolean">boolean | null</mat-option>
+          <mat-option value="combination">string | number | boolean | null</mat-option>
+        </mat-select>
+      </mat-form-field>
+    } @else {
+      @if (data.nullFields.length === 0) {
+        <p class="no-nulls">No null fields detected in schema.</p>
+      } @else {
+        <div class="per-field-list" formGroupName="perFieldNullMap">
+          @for (field of data.nullFields; track field) {
+            <mat-form-field appearance="outline">
+              <mat-label>{{ field }}</mat-label>
+              <mat-select [formControlName]="field">
+                <mat-option value="string">string | null</mat-option>
+                <mat-option value="number">number | null</mat-option>
+                <mat-option value="boolean">boolean | null</mat-option>
+                <mat-option value="combination">string | number | boolean | null</mat-option>
+              </mat-select>
+            </mat-form-field>
+          }
+        </div>
+      }
+    }
+
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="dismiss()">Cancel</button>
+  <button mat-flat-button [disabled]="form.invalid" (click)="confirm()">Generate</button>
+</mat-dialog-actions>

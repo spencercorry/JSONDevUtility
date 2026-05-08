@@ -1,6 +1,18 @@
 import { SchemaKind, SchemaNode } from '../models/generation-config.model';
 import { singularPascal, toPascalCase } from './singularize.util';
 
+export function extractNullFields(tree: SchemaNode): string[] {
+  const seen = new Set<string>();
+  collect(tree, seen);
+  return [...seen];
+}
+
+function collect(node: SchemaNode, out: Set<string>): void {
+  if (node.kind === 'null' && node.key) out.add(node.key);
+  for (const child of node.children) collect(child, out);
+  if (node.itemType) collect(node.itemType, out);
+}
+
 export function buildSchemaTree(value: unknown, key: string, typeName: string): SchemaNode {
   if (value === null) {
     return leaf(key, 'null', 'null');

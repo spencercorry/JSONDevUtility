@@ -103,14 +103,17 @@
 - `JsonStateService` updated — `rawValue` read via `untracked(() => this.parseResult().value)` and passed to `generate()`; `generate()` signature updated to accept `value: unknown`
 - `ng build` passes cleanly ✓
 
-### Phase 8 — Submit Modal
-- [ ] Create `src/app/components/submit-modal/` component
-- [ ] Root type name input (required, non-empty validator)
-- [ ] Pydantic v1/v2 radio toggle
-- [ ] Null mode toggle: Global vs Per-field
-  - Global: single dropdown (string | null, number | null, boolean | null, combination)
-  - Per-field: dynamic list from null-valued nodes in schema tree
-- [ ] Returns `GenerationConfig` on confirm, `undefined` on dismiss
+### Phase 8 — Submit Modal — 2026-05-08
+- `src/app/components/submit-modal/` created — `SubmitModalComponent` + `SubmitModalData` interface
+  - `MAT_DIALOG_DATA` receives `{ nullFields: string[] }`; `MatDialogRef` closes with `GenerationConfig | undefined`
+  - Reactive form: `rootTypeName` (custom `nonEmpty` validator + `markAllAsTouched` on failed submit), `pydanticVersion`, `nullMode`, `globalNullType`, `perFieldNullMap` (dynamic FormGroup)
+  - `MatButtonToggleGroup` for pydantic version (v1/v2) and null mode (Global/Per Field)
+  - Global mode: single `mat-select` for null type
+  - Per-field mode: dynamic `mat-select` per null field key; "No null fields detected" fallback
+  - `isGlobal` getter drives `@if` control flow in template
+  - `panelClass: 'utility-modal'` applied by caller (Phase 10)
+- `extractNullFields(tree)` added to `json-parser.util.ts` — DFS traversal collecting null node keys (deduplicated via Set)
+- `ng build` passes cleanly ✓
 
 ### Phase 9 — Right Pane & Output Tabs
 - [ ] Create `src/app/components/right-pane/` component

@@ -1,0 +1,38 @@
+@use '../../../styles/variables' as vars;
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 360px;
+  padding-top: 8px;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.toggle-label {
+  color: vars.$text-muted;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.per-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.no-nulls {
+  color: vars.$text-muted;
+  font-size: 13px;
+  margin: 0;
+}
