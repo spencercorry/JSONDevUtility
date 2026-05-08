@@ -6,6 +6,7 @@ import {
   ParseResult,
   SchemaNode,
 } from '../models/generation-config.model';
+import { buildSchemaTree } from '../utils/json-parser.util';
 
 @Injectable({ providedIn: 'root' })
 export class JsonStateService {
@@ -34,9 +35,9 @@ export class JsonStateService {
 
   readonly schemaTree = computed<SchemaNode | null>(() => {
     const result = this.parseResult();
-    if (!result.ok) return null;
-    // Populated in Phase 4 when buildSchemaTree() is wired in
-    return null;
+    const config = this.generationConfig();
+    if (!result.ok || !config) return null;
+    return buildSchemaTree(result.value, '', config.rootTypeName);
   });
 
   constructor() {

@@ -47,10 +47,19 @@
 
 ## TODO — Next Steps
 
-### Phase 4 — Schema Parser Utilities
-- [ ] Create `src/app/utils/json-parser.util.ts` — recursive `buildSchemaTree()`
-- [ ] Create `src/app/utils/singularize.util.ts` — pluralized key → PascalCase singular
-- [ ] Handle edge cases: root array, null values, mixed-type arrays, empty arrays
+### Phase 4 — Schema Parser Utilities — 2026-05-08
+- `src/app/utils/singularize.util.ts` created — `singularize()`, `toPascalCase()`, `singularPascal()`
+  - Handles irregular plurals (children→child, people→person, etc.), invariants (status, series, etc.)
+  - Rules: ies→y, sses/xes/ches/shes→remove es, ses→remove es, ves→f, trailing s
+  - `toPascalCase` handles camelCase, snake_case, kebab-case input keys
+  - `singularPascal` splits camelCase words first, singularizes last word, then PascalCases all
+- `src/app/utils/json-parser.util.ts` created — recursive `buildSchemaTree(value, key, typeName)`
+  - Primitives: string, number (integer/float via `Number.isInteger`), boolean, null
+  - Objects: recurse into children with `toPascalCase(childKey)` as typeName
+  - Arrays: empty→unknown, all-objects→merge schemas, same type→representative, mixed→union node
+  - `mergeObjects()` merges all array item objects (union of keys, prefer non-null values)
+- `JsonStateService.schemaTree` wired — now calls `buildSchemaTree(result.value, '', config.rootTypeName)`
+- `ng build` passes cleanly ✓
 
 ### Phase 5 — TypeScript Generator
 - [ ] Create `src/app/services/typescript-generator.service.ts`
