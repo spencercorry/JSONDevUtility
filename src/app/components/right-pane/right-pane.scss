@@ -1,0 +1,59 @@
+@use '../../../styles/variables' as vars;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: vars.$surface-raised;
+  border-left: 1px solid vars.$border-subtle;
+}
+
+.output-tabs {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+// Make the tab body fill the remaining height
+::ng-deep .output-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  .mat-mdc-tab-body-wrapper {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .mat-mdc-tab-body-content {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
+.error-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, vars.$accent-error 12%, transparent);
+  border-top: 1px solid color-mix(in srgb, vars.$accent-error 35%, transparent);
+  color: vars.$accent-error;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  flex-shrink: 0;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

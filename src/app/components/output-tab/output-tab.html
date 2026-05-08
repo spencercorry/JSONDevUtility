@@ -1,0 +1,22 @@
+@if (content() === null) {
+  <div class="empty-state">
+    <mat-icon>data_object</mat-icon>
+    <p>Submit your JSON to generate output.</p>
+  </div>
+} @else {
+  <div class="editor-wrapper">
+    <ngx-monaco-editor
+      class="monaco-editor"
+      [options]="editorOptions()"
+      (onInit)="onEditorInit($event)"
+    />
+    <button
+      mat-icon-button
+      class="copy-btn"
+      [title]="copied() ? 'Copied!' : 'Copy to clipboard'"
+      (click)="copy()"
+    >
+      <mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon>
+    </button>
+  </div>
+}

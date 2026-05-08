@@ -1,0 +1,22 @@
+<mat-tab-group
+  class="output-tabs"
+  animationDuration="0ms"
+  (selectedIndexChange)="onTabChange($event)"
+>
+  <mat-tab label="TypeScript" [disabled]="!jsonState.isValid()">
+    <app-output-tab [content]="tabContent('typescript')" language="typescript" />
+  </mat-tab>
+  <mat-tab label="Pydantic" [disabled]="!jsonState.isValid()">
+    <app-output-tab [content]="tabContent('pydantic')" language="python" />
+  </mat-tab>
+  <mat-tab label="JS Object" [disabled]="!jsonState.isValid()">
+    <app-output-tab [content]="tabContent('jsObject')" language="javascript" />
+  </mat-tab>
+</mat-tab-group>
+
+@if (jsonState.rawJson().trim() && jsonState.errorMsg()) {
+  <div class="error-panel">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ jsonState.errorMsg() }}</span>
+  </div>
+}
