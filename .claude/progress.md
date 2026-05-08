@@ -109,9 +109,17 @@
 
 ## TODO — Next Steps
 
-### Pending
+### Deployment
 - Set GitHub remote and replace `REPO-NAME` in `build:gh-pages` script
-- User-requested edits / feature suggestions
+
+### Feature Requests
+1. **Resizable panels** — replace fixed 50/50 split with a draggable divider; default to 50/50
+2. **Header** — fixed bar above both panels with space for a logo (name/logo TBD)
+3. **Help modal** — Help button opens a modal with usage instructions for the app
+4. **Update button** — after Submit, the Submit button becomes an Update button that silently re-runs generation with the same config (no modal); reverts to Submit after Clear
+5. **Clear button** — appears after Submit; clears the editor content, output cache, and generationConfig; resets Update → Submit
+6. **Generator tests** — unit tests (Karma/Jasmine) verifying correct output for TypeScript, Pydantic, and JS Object generators across key cases
+7. **Mobile support** — define and implement a responsive layout strategy for small screens
 
 ---
 
