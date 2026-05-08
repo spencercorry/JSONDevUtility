@@ -15,7 +15,7 @@
   min-height: 0;
 }
 
-// Make the tab body fill the remaining height
+// Make the tab body fill the remaining height; style disabled tabs
 ::ng-deep .output-tabs {
   display: flex;
   flex-direction: column;
@@ -29,6 +29,12 @@
   .mat-mdc-tab-body-content {
     height: 100%;
     overflow: hidden;
+  }
+
+  .mat-mdc-tab[aria-disabled='true'] {
+    opacity: 0.38;
+    cursor: not-allowed;
+    pointer-events: auto;
   }
 }
 
