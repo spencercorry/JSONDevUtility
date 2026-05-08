@@ -1,9 +1,13 @@
 import { Component, effect, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MonacoEditorModule } from 'ngx-monaco-editor-v2';
+import { GenerationConfig } from '../../models/generation-config.model';
 import { JsonStateService } from '../../services/json-state.service';
+import { extractNullFields } from '../../utils/json-parser.util';
 import { registerUtilityDarkTheme } from '../../utils/monaco-theme.util';
+import { SubmitModalComponent, SubmitModalData } from '../submit-modal/submit-modal';
 
 @Component({
   selector: 'app-left-pane',
@@ -13,6 +17,7 @@ import { registerUtilityDarkTheme } from '../../utils/monaco-theme.util';
 })
 export class LeftPaneComponent {
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
   protected readonly jsonState = inject(JsonStateService);
   private editorRef: any = null;
 
@@ -69,6 +74,16 @@ export class LeftPaneComponent {
   }
 
   protected submit(): void {
-    // Phase 10: open SubmitModalComponent via MatDialog
+    const tree = this.jsonState.schemaTree();
+    if (!tree) return;
+
+    const ref = this.dialog.open<SubmitModalComponent, SubmitModalData, GenerationConfig | undefined>(
+      SubmitModalComponent,
+      { panelClass: 'utility-modal', data: { nullFields: extractNullFields(tree) } }
+    );
+
+    ref.afterClosed().subscribe(config => {
+      if (config) this.jsonState.applyConfig(config);
+    });
   }
 }
