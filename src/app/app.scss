@@ -1,0 +1,12 @@
+@use '../styles/variables' as vars;
+
+:host {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.right-pane-placeholder {
+  background-color: vars.$surface-raised;
+}

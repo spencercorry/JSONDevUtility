@@ -1,0 +1,12 @@
+<div class="editor-wrapper">
+  <ngx-monaco-editor
+    class="monaco-editor"
+    [options]="editorOptions"
+    (onInit)="onEditorInit($event)"
+  ></ngx-monaco-editor>
+</div>
+
+<div class="actions">
+  <button mat-stroked-button (click)="beautify()">Beautify</button>
+  <button mat-flat-button [disabled]="!jsonState.isValid()" (click)="submit()">Submit</button>
+</div>

@@ -1,11 +1,10 @@
 import { Component } from '@angular/core';
+import { LeftPaneComponent } from './components/left-pane/left-pane.component';
 
 @Component({
   selector: 'app-root',
-  imports: [],
+  imports: [LeftPaneComponent],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
 })
-export class App {
-  protected title = 'jsonapp';
-}
+export class App {}
