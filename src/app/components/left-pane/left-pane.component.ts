@@ -74,7 +74,7 @@ export class LeftPaneComponent {
   }
 
   protected submit(): void {
-    const tree = this.jsonState.schemaTree();
+    const tree = this.jsonState.schemaTreePreview();
     if (!tree) return;
 
     const ref = this.dialog.open<SubmitModalComponent, SubmitModalData, GenerationConfig | undefined>(

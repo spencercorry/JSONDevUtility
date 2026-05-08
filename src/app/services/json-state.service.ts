@@ -36,6 +36,12 @@ export class JsonStateService {
     return result.ok ? null : (result.error ?? null);
   });
 
+  readonly schemaTreePreview = computed<SchemaNode | null>(() => {
+    const result = this.parseResult();
+    if (!result.ok) return null;
+    return buildSchemaTree(result.value, '', 'Root');
+  });
+
   readonly schemaTree = computed<SchemaNode | null>(() => {
     const result = this.parseResult();
     const config = this.generationConfig();
