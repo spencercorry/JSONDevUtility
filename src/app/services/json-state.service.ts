@@ -7,6 +7,7 @@ import {
   SchemaNode,
 } from '../models/generation-config.model';
 import { buildSchemaTree } from '../utils/json-parser.util';
+import { JsObjectGeneratorService } from './js-object-generator.service';
 import { PydanticGeneratorService } from './pydantic-generator.service';
 import { TypescriptGeneratorService } from './typescript-generator.service';
 
@@ -44,6 +45,7 @@ export class JsonStateService {
 
   private readonly tsGenerator = inject(TypescriptGeneratorService);
   private readonly pyGenerator = inject(PydanticGeneratorService);
+  private readonly jsGenerator = inject(JsObjectGeneratorService);
 
   constructor() {
     effect(() => {
@@ -56,7 +58,8 @@ export class JsonStateService {
       const cache = untracked(() => this.outputCache());
       if (cache[tab] !== null) return;
 
-      const output = this.generate(tab, tree, config);
+      const rawValue = untracked(() => this.parseResult().value);
+      const output = this.generate(tab, tree, rawValue, config);
       this.outputCache.update(c => ({ ...c, [tab]: output }));
     });
   }
@@ -66,11 +69,11 @@ export class JsonStateService {
     this.generationConfig.set(config);
   }
 
-  private generate(tab: OutputTab, tree: SchemaNode, config: GenerationConfig): string {
+  private generate(tab: OutputTab, tree: SchemaNode, value: unknown, config: GenerationConfig): string {
     switch (tab) {
       case 'typescript': return this.tsGenerator.generate(tree, config);
       case 'pydantic':   return this.pyGenerator.generate(tree, config);
-      case 'jsObject':   return '// JS Object generation coming soon';
+      case 'jsObject':   return this.jsGenerator.generate(value, config);
     }
   }
 }

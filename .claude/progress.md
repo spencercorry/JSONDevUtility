@@ -91,10 +91,17 @@
 - `JsonStateService` wired — `PydanticGeneratorService` injected, `generate('pydantic', ...)` routed
 - `ng build` passes cleanly ✓
 
-### Phase 7 — JS Object Generator
-- [ ] Create `src/app/services/js-object-generator.service.ts`
-- [ ] Output: `const data = { ... }` with unquoted valid JS identifier keys
-- [ ] String values use single quotes
+### Phase 7 — JS Object Generator — 2026-05-08
+- `src/app/services/js-object-generator.service.ts` created
+  - `generate(value, config)` — takes raw parsed value (not schema tree)
+  - Variable name: camelCase of `config.rootTypeName` (e.g., "UserProfile" → `const userProfile = ...`)
+  - Keys: unquoted if valid JS identifier, single-quoted otherwise
+  - Strings: single-quoted, with `\'` and `\\` escaping
+  - Numbers, booleans, null: JS literals
+  - Arrays and objects: indented with 2-space depth tracking
+  - try/catch → `// Generation error: ...`
+- `JsonStateService` updated — `rawValue` read via `untracked(() => this.parseResult().value)` and passed to `generate()`; `generate()` signature updated to accept `value: unknown`
+- `ng build` passes cleanly ✓
 
 ### Phase 8 — Submit Modal
 - [ ] Create `src/app/components/submit-modal/` component
