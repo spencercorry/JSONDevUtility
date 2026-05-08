@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Loading project progress log...",
+            "command": "$p = 'C:\\Users\\scorr\\Documents\\angular\\jsonapp\\.claude\\progress.md'; $c = if (Test-Path $p) { [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8) } else { 'No progress log found.' }; @{ hookSpecificOutput = @{ hookEventName = 'SessionStart'; additionalContext = \"=== PROJECT PROGRESS LOG ===`n$c\" } } | ConvertTo-Json -Depth 5 -Compress | Write-Output"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Reminding Claude to update progress log...",
+            "command": "@{ hookSpecificOutput = @{ hookEventName = 'PreCompact'; additionalContext = 'REQUIRED: Before this compaction completes, update .claude/progress.md - mark completed TODOs as done, summarize all work since the last log update, and add any new TODOs discovered this session.' } } | ConvertTo-Json -Depth 5 -Compress | Write-Output"
+          }
+        ]
+      }
+    ]
+  }
+}

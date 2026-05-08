@@ -1,1 +1,42 @@
-/* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+@use './styles/variables' as vars;
+
+html {
+  color-scheme: dark;
+
+  @include mat.theme((
+    color: (
+      primary: mat.$violet-palette,
+      tertiary: mat.$cyan-palette,
+      theme-type: dark,
+    ),
+    typography: Inter,
+    density: -1,
+  ));
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background-color: vars.$surface-base;
+  color: vars.$text-primary;
+  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+}
+
+// Angular Material dialog panel override
+.utility-modal .mat-mdc-dialog-surface {
+  background-color: vars.$surface-raised;
+  border: 1px solid vars.$border-subtle;
+  border-radius: 12px !important;
+}
