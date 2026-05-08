@@ -61,12 +61,20 @@
 - `JsonStateService.schemaTree` wired — now calls `buildSchemaTree(result.value, '', config.rootTypeName)`
 - `ng build` passes cleanly ✓
 
-### Phase 5 — TypeScript Generator
-- [ ] Create `src/app/services/typescript-generator.service.ts`
-- [ ] `export interface` per object node, flat/separate (not nested namespaces)
-- [ ] Root uses `rootTypeName`, nested use `PascalCase(key)`
-- [ ] All fields required; null mapping per `GenerationConfig`
-- [ ] Root-level array → item interface + `type RootName = ItemType[]`
+### Phase 5 — TypeScript Generator — 2026-05-08
+- `src/app/services/typescript-generator.service.ts` created
+  - `generate(tree, config)` entry point with try/catch → `// Generation error: ...` on failure
+  - Root object → flat `export interface` declarations, root first, nested children below
+  - Root array of objects → `export interface ItemType { ... }` + `export type Root = ItemType[]`
+    - Item name derived via `singularPascal(rootName)` or `rootName + 'Item'` if unchanged
+  - Root array of primitives → `export type Root = number[]` etc.
+  - Root primitive/null/union → `export type Root = string;` etc.
+  - Null fields resolved via `nullMode`: global uses `globalNullType`; per-field reads `perFieldNullMap[key]` with `globalNullType` fallback
+  - `NullType` values map to: `string | null`, `number | null`, `boolean | null`, `string | number | boolean | null`
+  - Special chars in keys quoted: `"@type": string`
+  - Deduplication via `seen` Set — same typeName emitted only once
+- `JsonStateService` wired — `TypescriptGeneratorService` injected, `generate('typescript', ...)` routed to it
+- `ng build` passes cleanly ✓
 
 ### Phase 6 — Pydantic Generator
 - [ ] Create `src/app/services/pydantic-generator.service.ts`

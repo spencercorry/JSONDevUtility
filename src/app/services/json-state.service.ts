@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, signal, untracked } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   GenerationConfig,
   OutputCache,
@@ -7,6 +7,7 @@ import {
   SchemaNode,
 } from '../models/generation-config.model';
 import { buildSchemaTree } from '../utils/json-parser.util';
+import { TypescriptGeneratorService } from './typescript-generator.service';
 
 @Injectable({ providedIn: 'root' })
 export class JsonStateService {
@@ -40,6 +41,8 @@ export class JsonStateService {
     return buildSchemaTree(result.value, '', config.rootTypeName);
   });
 
+  private readonly tsGenerator = inject(TypescriptGeneratorService);
+
   constructor() {
     effect(() => {
       const tab = this.activeTab();
@@ -61,8 +64,11 @@ export class JsonStateService {
     this.generationConfig.set(config);
   }
 
-  private generate(tab: OutputTab, _tree: SchemaNode, _config: GenerationConfig): string {
-    // Generators wired in Phase 5–7
-    return `// ${tab} generation coming soon`;
+  private generate(tab: OutputTab, tree: SchemaNode, config: GenerationConfig): string {
+    switch (tab) {
+      case 'typescript': return this.tsGenerator.generate(tree, config);
+      case 'pydantic':   return '# Pydantic generation coming soon';
+      case 'jsObject':   return '// JS Object generation coming soon';
+    }
   }
 }
