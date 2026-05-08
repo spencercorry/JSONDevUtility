@@ -13,141 +13,105 @@
 ### Phase 1 — Scaffold & Theme — 2026-05-08
 - Angular 20.0.3 scaffolded: standalone components, SCSS, no routing, no SSR, git initialized
 - `@angular/material@20.2.14` installed (M3 theming engine)
-- `@angular/animations` installed (required peer dependency, matched to Angular 20)
 - `src/styles/_variables.scss` created — 9 design tokens (surface, border, accent colors)
 - `src/styles.scss` rewritten — M3 dark theme via `mat.theme()`, violet + cyan palette, Inter typography, density -1, global `.utility-modal` dialog override
-- `src/index.html` updated — title set to "JSON Dev Utility", Inter + JetBrains Mono fonts added, Material Icons kept
-- `src/app/app.config.ts` updated — `provideAnimationsAsync()` added
-- `CLAUDE.md` initialized — commands, architecture overview, data contracts, styling rules
+- `src/index.html` updated — title "JSON Dev Utility", Inter + JetBrains Mono fonts
+- `CLAUDE.md` initialized
 - `ng build` passes cleanly ✓
 
 ### Phase 2 — Monaco Integration & Left Pane — 2026-05-08
 - Upgraded Angular 20 → 21.2 (required for ngx-monaco-editor-v2 compatibility)
-- `ngx-monaco-editor-v2` installed
-- Monaco worker assets added to `angular.json`
-- `src/app/utils/monaco-theme.util.ts` created — `utilityDark` custom theme
-- `src/app/components/left-pane/` created — Monaco JSON editor, Beautify + Submit buttons
-- `src/app/services/json-state.service.ts` created — minimal `rawJson` + `isValid` signals
-- `AppComponent` updated — 50/50 CSS Grid layout, right pane placeholder
+- `ngx-monaco-editor-v2` installed; Monaco worker assets added to `angular.json`
+- `src/app/utils/monaco-theme.util.ts` — `utilityDark` custom theme
+- `src/app/components/left-pane/` — Monaco JSON editor, Beautify + Submit buttons
+- `AppComponent` — 50/50 CSS Grid layout
 - `provideMonacoEditor()` added to `app.config.ts`
+- **Bug fix**: removed `[ngModel]` binding; replaced with native Monaco API
+  (`onDidChangeModelContent` + `effect()` guard) — fixed cursor reset on every keystroke
+- **Bug fix**: `baseUrl: 'assets/vs'` (not `'assets'`) — fixed Monaco not rendering;
+  `ngx-monaco-editor-v2` internally overrides `baseUrl === "assets"` to a nonexistent path
 - `ng build` passes cleanly ✓
-
----
 
 ### Phase 3 — JsonStateService & Signal Graph — 2026-05-08
-- `src/app/models/generation-config.model.ts` created — `NullType`, `PydanticVersion`, `NullMode`, `OutputTab`, `SchemaKind`, `GenerationConfig`, `SchemaNode`, `OutputCache`, `ParseResult`
-- `src/app/services/json-state.service.ts` expanded — full signal graph wired
+- `src/app/models/generation-config.model.ts` — all core types
+- `src/app/services/json-state.service.ts` — full signal graph
   - Writable: `rawJson`, `generationConfig`, `activeTab`, `outputCache`
-  - Computed: `parseResult` (try/catch JSON.parse with SyntaxError message), `isValid`, `errorMsg`, `schemaTree` (stubbed — returns null until Phase 4)
-  - `applyConfig()` — nulls cache, sets new config
-  - `effect()` — reads `activeTab`/`schemaTree`/`generationConfig`; skips if cache hit; calls stubbed `generate()` method
+  - Computed: `parseResult`, `isValid`, `errorMsg`, `schemaTree`, `schemaTreePreview`
+  - `applyConfig()` — resets cache, sets config
+  - `effect()` — lazy generation per active tab with cache-hit guard
 - `ng build` passes cleanly ✓
+
+### Phase 4 — Schema Parser Utilities — 2026-05-08
+- `src/app/utils/singularize.util.ts` — `singularize()`, `toPascalCase()`, `singularPascal()`
+- `src/app/utils/json-parser.util.ts` — recursive `buildSchemaTree()` + `extractNullFields()`
+- `ng build` passes cleanly ✓
+
+### Phase 5 — TypeScript Generator — 2026-05-08
+- `src/app/services/typescript-generator.service.ts`
+  - Flat `export interface` declarations, root first; dedup via `seen` Set
+  - Root arrays, primitives, unions all handled
+  - Null fields resolved via `nullMode` / `globalNullType` / `perFieldNullMap`
+  - Special-char keys quoted; try/catch → `// Generation error: ...`
+- `ng build` passes cleanly ✓
+
+### Phase 6 — Pydantic Generator — 2026-05-08
+- `src/app/services/pydantic-generator.service.ts`
+  - Dependency-first class ordering (children before parents)
+  - v1/v2 support; dynamic `from typing import ...` only for used types
+  - Null fields → `Optional[...]` + `= None`; field name sanitization
+  - try/catch → `# Generation error: ...`
+- `ng build` passes cleanly ✓
+
+### Phase 7 — JS Object Generator — 2026-05-08
+- `src/app/services/js-object-generator.service.ts`
+  - Operates on raw parsed value (not schema tree)
+  - Single-quoted strings, unquoted valid JS identifier keys, 2-space indent
+  - try/catch → `// Generation error: ...`
+- `ng build` passes cleanly ✓
+
+### Phase 8 — Submit Modal — 2026-05-08
+- `src/app/components/submit-modal/` — `SubmitModalComponent` + `SubmitModalData`
+  - Reactive form: root type name, pydantic version, null mode, per-field null map
+  - `MatButtonToggleGroup` for version + null mode; dynamic per-field selects
+  - Closes with `GenerationConfig | undefined`
+- `ng build` passes cleanly ✓
+
+### Phase 9 — Right Pane & Output Tabs — 2026-05-08
+- `src/app/components/right-pane/` — `MatTabGroup` (TypeScript / Pydantic / JS Object)
+  - Tabs disabled when JSON invalid; error panel shows parse error message
+- `src/app/components/output-tab/` — read-only Monaco editor per tab
+  - Copy-to-clipboard button with 2s checkmark feedback
+  - Empty-state prompt before first Submit
+- `ng build` passes cleanly ✓
+
+### Phase 10 — Wire Everything Together — 2026-05-08
+- Submit button opens `SubmitModalComponent` with null fields from `schemaTreePreview`
+- `afterClosed()` calls `jsonState.applyConfig(config)` → resets cache → triggers lazy `effect()`
+- **Bug fix**: `submit()` now uses `schemaTreePreview` (config-independent) instead of
+  `schemaTree` — fixed Submit doing nothing before first submission (config was null)
+- `ng build` passes cleanly ✓
+
+### Phases 11 + 12 + 13 — Polish — 2026-05-08
+- Phase 11 (snackbars + catch-alls): all implemented in earlier phases
+- Phase 12 (models file): implemented in Phase 3
+- Phase 13: disabled tab labels styled with reduced opacity + `cursor: not-allowed`
+- `ng build` passes cleanly ✓
+
+### Phase 14 — Build Config & Deploy Prep — 2026-05-08
+- Initial bundle budget raised to 1MB warning / 2MB error (~675kB actual)
+- `build:gh-pages` script added to `package.json`:
+  `ng build --base-href /REPO-NAME/ && node -e "...copyFileSync index.html → 404.html"`
+  Replace `REPO-NAME` with the actual GitHub repository name before deploying
+- Monaco assets already in `angular.json` assets array from Phase 2
+- `ng build` passes cleanly ✓ (no warnings)
 
 ---
 
 ## TODO — Next Steps
 
-### Phase 4 — Schema Parser Utilities — 2026-05-08
-- `src/app/utils/singularize.util.ts` created — `singularize()`, `toPascalCase()`, `singularPascal()`
-  - Handles irregular plurals (children→child, people→person, etc.), invariants (status, series, etc.)
-  - Rules: ies→y, sses/xes/ches/shes→remove es, ses→remove es, ves→f, trailing s
-  - `toPascalCase` handles camelCase, snake_case, kebab-case input keys
-  - `singularPascal` splits camelCase words first, singularizes last word, then PascalCases all
-- `src/app/utils/json-parser.util.ts` created — recursive `buildSchemaTree(value, key, typeName)`
-  - Primitives: string, number (integer/float via `Number.isInteger`), boolean, null
-  - Objects: recurse into children with `toPascalCase(childKey)` as typeName
-  - Arrays: empty→unknown, all-objects→merge schemas, same type→representative, mixed→union node
-  - `mergeObjects()` merges all array item objects (union of keys, prefer non-null values)
-- `JsonStateService.schemaTree` wired — now calls `buildSchemaTree(result.value, '', config.rootTypeName)`
-- `ng build` passes cleanly ✓
-
-### Phase 5 — TypeScript Generator — 2026-05-08
-- `src/app/services/typescript-generator.service.ts` created
-  - `generate(tree, config)` entry point with try/catch → `// Generation error: ...` on failure
-  - Root object → flat `export interface` declarations, root first, nested children below
-  - Root array of objects → `export interface ItemType { ... }` + `export type Root = ItemType[]`
-    - Item name derived via `singularPascal(rootName)` or `rootName + 'Item'` if unchanged
-  - Root array of primitives → `export type Root = number[]` etc.
-  - Root primitive/null/union → `export type Root = string;` etc.
-  - Null fields resolved via `nullMode`: global uses `globalNullType`; per-field reads `perFieldNullMap[key]` with `globalNullType` fallback
-  - `NullType` values map to: `string | null`, `number | null`, `boolean | null`, `string | number | boolean | null`
-  - Special chars in keys quoted: `"@type": string`
-  - Deduplication via `seen` Set — same typeName emitted only once
-- `JsonStateService` wired — `TypescriptGeneratorService` injected, `generate('typescript', ...)` routed to it
-- `ng build` passes cleanly ✓
-
-### Phase 6 — Pydantic Generator — 2026-05-08
-- `src/app/services/pydantic-generator.service.ts` created
-  - Classes emitted in dependency-first order (children before parents) — required for Python forward references
-  - v1: `from pydantic import BaseModel`; v2: adds `ConfigDict`, emits `model_config = ConfigDict(strict=True)` as first field
-  - Type mappings: `str`, `int`, `float`, `bool`, `List[X]`, `Optional[X]`, `Union[...]`, `Any`
-  - `primitiveType: 'integer'` → `int`; `'float'` → `float`; `'number'` → `float` (safe default)
-  - Null fields → `Optional[str/float/bool/Union[str, float, bool]]` + `= None` default
-  - `combination` null type → `Optional[Union[str, float, bool]]`
-  - Dynamic imports — only emits `from typing import ...` for types actually used
-  - Root array → type alias `RootName = List[ItemType]`; item class emitted above it
-  - Field name sanitization: hyphens → underscores, leading digits prefixed `_`
-  - try/catch → `# Generation error: ...`
-- `JsonStateService` wired — `PydanticGeneratorService` injected, `generate('pydantic', ...)` routed
-- `ng build` passes cleanly ✓
-
-### Phase 7 — JS Object Generator — 2026-05-08
-- `src/app/services/js-object-generator.service.ts` created
-  - `generate(value, config)` — takes raw parsed value (not schema tree)
-  - Variable name: camelCase of `config.rootTypeName` (e.g., "UserProfile" → `const userProfile = ...`)
-  - Keys: unquoted if valid JS identifier, single-quoted otherwise
-  - Strings: single-quoted, with `\'` and `\\` escaping
-  - Numbers, booleans, null: JS literals
-  - Arrays and objects: indented with 2-space depth tracking
-  - try/catch → `// Generation error: ...`
-- `JsonStateService` updated — `rawValue` read via `untracked(() => this.parseResult().value)` and passed to `generate()`; `generate()` signature updated to accept `value: unknown`
-- `ng build` passes cleanly ✓
-
-### Phase 8 — Submit Modal — 2026-05-08
-- `src/app/components/submit-modal/` created — `SubmitModalComponent` + `SubmitModalData` interface
-  - `MAT_DIALOG_DATA` receives `{ nullFields: string[] }`; `MatDialogRef` closes with `GenerationConfig | undefined`
-  - Reactive form: `rootTypeName` (custom `nonEmpty` validator + `markAllAsTouched` on failed submit), `pydanticVersion`, `nullMode`, `globalNullType`, `perFieldNullMap` (dynamic FormGroup)
-  - `MatButtonToggleGroup` for pydantic version (v1/v2) and null mode (Global/Per Field)
-  - Global mode: single `mat-select` for null type
-  - Per-field mode: dynamic `mat-select` per null field key; "No null fields detected" fallback
-  - `isGlobal` getter drives `@if` control flow in template
-  - `panelClass: 'utility-modal'` applied by caller (Phase 10)
-- `extractNullFields(tree)` added to `json-parser.util.ts` — DFS traversal collecting null node keys (deduplicated via Set)
-- `ng build` passes cleanly ✓
-
-### Phase 9 — Right Pane & Output Tabs
-- [ ] Create `src/app/components/right-pane/` component
-- [ ] `MatTabGroup`: TypeScript, Pydantic, JS Object tabs
-- [ ] Tabs disabled + greyed when `!isValid()`
-- [ ] Error panel shown in tab body when invalid (line/col message)
-- [ ] Create `src/app/components/output-tab/` component
-  - Read-only Monaco editor per tab
-  - Copy to Clipboard button (top-right, checkmark on success)
-  - Spinner/skeleton while `content()` is null
-
-### Phase 10 — Wire Everything Together
-- [ ] Connect Submit button → modal → `applyConfig()` → lazy `effect()`
-- [ ] Connect left pane editor changes → `rawJson` signal
-- [ ] Confirm tab switching triggers generation correctly
-
-### Phase 11 — Beautify & Error Snackbars
-- [ ] Beautify: format in-place, snackbar `"Cannot beautify — fix JSON errors first."` if invalid
-- [ ] Clipboard failure snackbar: `"Copy failed. Please select and copy manually."`
-- [ ] Generator catch-all: output `// Generation error: <msg>` in tab
-
-### Phase 12 — Models File
-- [ ] Create `src/app/models/generation-config.model.ts` — `GenerationConfig`, `SchemaNode`, `OutputCache` TypeScript interfaces
-
-### Phase 13 — Polish
-- [ ] Disabled tab label opacity + `cursor: not-allowed` styles
-- [ ] Copy button transition (icon swap to checkmark, revert after 2s)
-- [ ] Smooth tab switch transitions
-
-### Phase 14 — Build Config & Deploy Prep
-- [ ] Set `baseHref` in `angular.json` for GitHub Pages repo name
-- [ ] Add Monaco assets to `angular.json` assets array (if not done in Phase 2)
-- [ ] Verify `404.html` copy step for GitHub Pages
-- [ ] Final `ng build` clean pass
+### Pending
+- Set GitHub remote and replace `REPO-NAME` in `build:gh-pages` script
+- User-requested edits / feature suggestions
 
 ---
 
@@ -158,3 +122,5 @@
 - **Styling**: M3 only (`mat.theme()`). SCSS tokens in `src/styles/_variables.scss`. Import as `@use '../styles/variables' as vars`.
 - **Monaco theme**: Custom `utilityDark` registered on editor `onInit`. Both panes use it.
 - **Dialog**: Always pass `panelClass: 'utility-modal'` to `MatDialog.open()`.
+- **`schemaTreePreview`**: config-independent tree used for null field extraction in Submit flow.
+  `schemaTree` (config-dependent) is used only for generation inside `effect()`.
