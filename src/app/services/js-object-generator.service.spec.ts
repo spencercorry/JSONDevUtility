@@ -111,4 +111,23 @@ describe('JsObjectGeneratorService', () => {
     const out = svc.generate({}, brokenCfg);
     expect(out).toContain('// Generation error:');
   });
+
+  // ── Backslash escaping ───────────────────────────────────────────────────
+
+  it('escapes backslashes inside string values', () => {
+    const out = svc.generate({ path: 'C:\\Users\\test' }, cfg('Root'));
+    expect(out).toContain("path: 'C:\\\\Users\\\\test'");
+  });
+
+  // ── Falsy values ─────────────────────────────────────────────────────────
+
+  it('renders false as a literal', () => {
+    const out = svc.generate({ active: false }, cfg('Root'));
+    expect(out).toContain('active: false');
+  });
+
+  it('renders 0 as a literal', () => {
+    const out = svc.generate({ count: 0 }, cfg('Root'));
+    expect(out).toContain('count: 0');
+  });
 });

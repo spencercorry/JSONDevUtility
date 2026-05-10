@@ -161,4 +161,42 @@ describe('TypescriptGeneratorService', () => {
     const out = svc.generate(brokenTree, cfg('Root'));
     expect(out).toContain('// Generation error:');
   });
+
+  // ── Deeply nested (3 levels) ─────────────────────────────────────────────
+
+  it('emits a separate interface for each level of a 3-level nested object', () => {
+    const out = svc.generate(
+      tree({ org: { team: { member: 'Alice' } } }, 'Root'),
+      cfg('Root')
+    );
+    expect(out).toContain('export interface Root {');
+    expect(out).toContain('export interface Org {');
+    expect(out).toContain('export interface Team {');
+    expect(out).toContain('org: Org;');
+    expect(out).toContain('team: Team;');
+    expect(out).toContain('member: string;');
+  });
+
+  // ── Non-root array-of-objects field ──────────────────────────────────────
+
+  it('types a non-root field containing an array of objects as ChildClass[]', () => {
+    const out = svc.generate(
+      tree({ users: [{ name: 'Alice', age: 30 }] }, 'Root'),
+      cfg('Root')
+    );
+    expect(out).toContain('export interface User {');
+    expect(out).toContain('users: User[];');
+    expect(out).toContain('name: string;');
+    expect(out).toContain('age: number;');
+  });
+
+  // ── Heterogeneous array union inference ───────────────────────────────────
+
+  it('types an array field with mixed primitives as (number | string)[]', () => {
+    const out = svc.generate(
+      tree({ ids: [1, 'abc'] }, 'Root'),
+      cfg('Root')
+    );
+    expect(out).toMatch(/ids: \(number \| string\)\[\]/);
+  });
 });

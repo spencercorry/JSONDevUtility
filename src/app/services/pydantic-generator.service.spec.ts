@@ -187,4 +187,37 @@ describe('PydanticGeneratorService', () => {
     const out = svc.generate(brokenTree, cfg('Root'));
     expect(out).toContain('# Generation error:');
   });
+
+  // ── Field name sanitization ───────────────────────────────────────────────
+
+  it('converts hyphenated keys to underscores in field names', () => {
+    const out = svc.generate(tree({ 'first-name': 'Alice' }, 'Root'), cfg('Root'));
+    expect(out).toContain('first_name: str');
+    expect(out).not.toContain('first-name');
+  });
+
+  it('prefixes digit-leading field names with an underscore', () => {
+    const out = svc.generate(tree({ '2nd': 'place' }, 'Root'), cfg('Root'));
+    expect(out).toContain('_2nd: str');
+  });
+
+  // ── Empty nested object → pass ────────────────────────────────────────────
+
+  it('emits pass for a nested object that has no fields', () => {
+    const out = svc.generate(tree({ meta: {} }, 'Root'), cfg('Root'));
+    expect(out).toContain('class Meta(BaseModel):');
+    expect(out).toContain('    pass');
+  });
+
+  // ── Array field with object items → List[ChildClass] ─────────────────────
+
+  it('types an array-of-objects field as List[ChildClass] and emits the child class', () => {
+    const out = svc.generate(
+      tree({ users: [{ name: 'Alice', age: 30 }] }, 'Root'),
+      cfg('Root')
+    );
+    expect(out).toContain('class User(BaseModel):');
+    expect(out).toContain('users: List[User]');
+    expect(out).toContain('from typing import List');
+  });
 });
