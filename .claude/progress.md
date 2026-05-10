@@ -96,6 +96,7 @@
 ### Phase 14 — Build Config & Deploy Prep — 2026-05-08
 - Initial bundle budget raised to 1MB warning / 2MB error (~675kB actual)
 - `build:gh-pages` script added to `package.json` for `/JSONDevUtility/` base-href
+- **Deploy command**: `npx ng deploy --base-href=/JSONDevUtility/` (do NOT use the build:gh-pages script + manual git push approach)
 - Monaco assets already in `angular.json` assets array from Phase 2
 - `ng build` passes cleanly ✓ (no warnings)
 
@@ -164,6 +165,87 @@
 - `src/index.html` — title updated to "TypeCast"; SVG favicon added as primary, `.ico` as fallback
 - Help modal: beta warning banner added at bottom (red-accented callout)
 - README, CLAUDE.md, and progress.md updated to reflect current state
+
+---
+
+## TODO — Next Steps
+
+### TODO-1: Nullable vs Optional distinction
+
+**Problem:** The app currently conflates two distinct concepts:
+- `error_code?: string` — the field may be absent from the object entirely (optional key)
+- `error_code: string | null` — the field is always present but its value can be null (nullable value)
+
+**Required changes:**
+
+#### A. Add `nullable` as a field attribute in the modal
+- Add a **Nullable** checkbox/button alongside the existing **Optional** checkbox on each field row
+- `nullable: true` means the value can be null — adds `null` to the type union
+- Nullable requires ≥1 primitive type to also be selected (cannot select nullable alone — `null` is not a standalone type)
+- Generate disabled if any field has only `nullable` checked with no primitive types
+
+#### B. Update `FieldConfig` model
+```ts
+export interface FieldConfig {
+  types:    FieldType[];   // primitive types (unchanged)
+  nullable: boolean;       // value can be null → adds null to union
+  optional: boolean;       // key may be absent → adds ? / = None
+}
+```
+
+#### C. Update generators to respect the distinction
+
+| Combination | TypeScript output | Pydantic output |
+|---|---|---|
+| `optional: false, nullable: false` | `field: string` | `field: str` |
+| `optional: true, nullable: false` | `field?: string` | `field: Optional[str] = None` |
+| `optional: false, nullable: true` | `field: string \| null` | `field: str \| None` |
+| `optional: true, nullable: true` | `field?: string \| null` | `field: Optional[str] = None` |
+
+Note: In Pydantic, `Optional[str]` is equivalent to `str | None`, so the nullable-only case should use `str | None` without `= None` to make the intent clear (field must be provided, just can be null).
+
+#### D. Update parser inference
+- Currently, a `null` JSON value produces `kind: 'null'` in the schema tree, which becomes "unresolved" in the modal. Instead, `null` values in the JSON should still produce `kind: 'null'` (user must pick types), but the `nullable` flag should default to `true` since we know the value is null in the sample.
+
+---
+
+### TODO-2: Infer optional fields from inconsistent object shapes
+
+**Problem:** When an array of same-type objects has inconsistent keys (e.g., some objects have `error_code` and others don't), the field is currently not recognized as optional — it either gets merged normally or produces unexpected output.
+
+**Example:**
+```json
+[
+  { "id": 1, "name": "Alice" },
+  { "id": 2, "name": "Bob", "error_code": "E001" }
+]
+```
+→ `error_code` should be inferred as `optional: true` because it only appears in some objects.
+
+**Required changes:**
+
+#### A. Update `mergeObjectSchemas()` in `json-parser.util.ts`
+- Track which fields appear in all objects vs only some objects
+- Fields present in fewer objects than the total count → mark as optional in the merged node
+- Add an `inferredOptional?: boolean` flag to `SchemaNode`, set by the merge step
+
+#### B. Update `extractAllLeafFields()` to surface the flag
+- Return `{ types: FieldType[], inferredOptional: boolean }` per field instead of just `FieldType[]`
+  (or keep types flat and pass optional inference separately)
+
+#### C. Pre-select Optional in the modal for inferred-optional fields
+- In the Advanced Options section, if a field was inferred as optional, pre-check the Optional button
+- User can still uncheck it manually
+
+#### D. Update tests
+- `json-parser.util.spec.ts`: add cases for missing keys across merged objects
+- Generator specs: add cases for inferred-optional fields flowing through to output
+
+---
+
+### Decisions Needed Before Implementation
+- Should Pydantic nullable-only (`nullable: true, optional: false`) use `str | None` (explicit) or `Optional[str]` (shorthand)? Leaning toward `str | None` to distinguish from optional.
+- Should the `nullable` and `optional` checkboxes in the modal be independent, or should checking `optional` auto-check `nullable` as a common default? Leaning toward independent.
 
 ---
 
