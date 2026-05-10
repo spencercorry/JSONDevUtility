@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { GenerationConfig, SchemaNode } from '../models/generation-config.model';
+import { FieldConfig, FieldType, GenerationConfig, SchemaNode } from '../models/generation-config.model';
 import { singularPascal } from '../utils/singularize.util';
 
 @Injectable({ providedIn: 'root' })
@@ -13,18 +13,18 @@ export class TypescriptGeneratorService {
       if (tree.kind === 'array') {
         const { itemType } = tree;
         if (itemType?.kind === 'object') {
-          const itemName = deriveItemName(rootName);
-          this.collectInterfaces({ ...itemType, typeName: itemName }, config, parts, seen);
+          const itemName = disambiguate(deriveItemName(rootName), rootName);
+          this.collectInterfaces({ ...itemType, typeName: itemName }, config, parts, seen, '', rootName);
           parts.push(`export type ${rootName} = ${itemName}[];`);
         } else {
-          const inner = itemType ? this.typeStr(itemType, config, '') : 'unknown';
+          const inner = itemType ? this.typeStr(itemType, config, '', rootName) : 'unknown';
           const wrapped = itemType?.kind === 'union' ? `(${inner})` : inner;
           parts.push(`export type ${rootName} = ${wrapped}[];`);
         }
       } else if (tree.kind === 'object') {
-        this.collectInterfaces(tree, config, parts, seen);
+        this.collectInterfaces({ ...tree, typeName: rootName }, config, parts, seen, '', rootName);
       } else {
-        parts.push(`export type ${rootName} = ${this.typeStr(tree, config, '')};`);
+        parts.push(`export type ${rootName} = ${this.typeStr(tree, config, '', rootName)};`);
       }
 
       return parts.join('\n\n');
@@ -37,49 +37,75 @@ export class TypescriptGeneratorService {
     node: SchemaNode,
     config: GenerationConfig,
     out: string[],
-    seen: Set<string>
+    seen: Set<string>,
+    basePath: string,
+    rootName: string
   ): void {
     if (node.kind === 'object') {
       if (seen.has(node.typeName)) return;
       seen.add(node.typeName);
-      out.push(this.buildInterface(node, config));
+      out.push(this.buildInterface(node, config, basePath, rootName));
       for (const child of node.children) {
-        this.collectInterfaces(child, config, out, seen);
+        const childPath = basePath ? `${basePath}.${child.key}` : child.key;
+        const resolvedChild =
+          child.kind === 'object'
+            ? { ...child, typeName: disambiguate(child.typeName, rootName) }
+            : child;
+        this.collectInterfaces(resolvedChild, config, out, seen, childPath, rootName);
       }
     } else if (node.kind === 'array' && node.itemType) {
-      this.collectInterfaces(node.itemType, config, out, seen);
+      // Pass basePath unchanged so the itemType's children inherit the array's path as prefix.
+      this.collectInterfaces(node.itemType, config, out, seen, basePath, rootName);
     }
   }
 
-  private buildInterface(node: SchemaNode, config: GenerationConfig): string {
+  private buildInterface(
+    node: SchemaNode,
+    config: GenerationConfig,
+    basePath: string,
+    rootName: string
+  ): string {
     const props = node.children
-      .map(child => `  ${fmtKey(child.key)}: ${this.typeStr(child, config, child.key)};`)
+      .map(child => {
+        const childPath = basePath ? `${basePath}.${child.key}` : child.key;
+        const fieldCfg = config.fieldMap[childPath];
+        const optional = fieldCfg?.optional ?? false;
+        const key = fmtKey(child.key) + (optional ? '?' : '');
+        return `  ${key}: ${this.typeStr(child, config, childPath, rootName)};`;
+      })
       .join('\n');
     return `export interface ${node.typeName} {\n${props}\n}`;
   }
 
-  private typeStr(node: SchemaNode, config: GenerationConfig, fieldPath: string): string {
+  private typeStr(
+    node: SchemaNode,
+    config: GenerationConfig,
+    fieldPath: string,
+    rootName: string
+  ): string {
+    // fieldMap overrides take priority for all leaf nodes (not object/array).
+    if (node.kind !== 'object' && node.kind !== 'array') {
+      const fieldCfg = config.fieldMap[fieldPath];
+      if (fieldCfg?.types.length) return fieldConfigToTs(fieldCfg);
+    }
+
     switch (node.kind) {
       case 'primitive':
-        return node.primitiveType === 'integer' || node.primitiveType === 'float'
-          ? 'number'
-          : (node.primitiveType ?? 'unknown');
+        return fieldTypeToTs(node.primitiveType);
       case 'null':
-        return nullTypeStr(config, fieldPath);
+        return 'unknown';
       case 'object':
-        return node.typeName;
+        return disambiguate(node.typeName, rootName);
       case 'array': {
         if (!node.itemType) return 'unknown[]';
-        const inner = this.typeStr(node.itemType, config, fieldPath);
+        const inner = this.typeStr(node.itemType, config, fieldPath, rootName);
         return node.itemType.kind === 'union' ? `(${inner})[]` : `${inner}[]`;
       }
       case 'union': {
-        const members = (node.unionMembers ?? []).map(m => {
-          if (m === 'null') return nullTypeStr(config, fieldPath);
-          if (m === 'integer' || m === 'float') return 'number';
-          return m;
-        });
-        return members.join(' | ');
+        const members = (node.unionMembers ?? []).map(m =>
+          m === 'null' ? 'unknown' : fieldTypeToTs(m as FieldType)
+        );
+        return [...new Set(members)].join(' | ');
       }
       case 'unknown':
         return 'unknown';
@@ -92,17 +118,26 @@ function deriveItemName(rootName: string): string {
   return sing !== rootName ? sing : `${rootName}Item`;
 }
 
-function nullTypeStr(config: GenerationConfig, fieldPath: string): string {
-  const t =
-    config.nullMode === 'global'
-      ? config.globalNullType
-      : (config.perFieldNullMap[fieldPath] ?? config.globalNullType);
-  switch (t) {
-    case 'string':      return 'string | null';
-    case 'number':      return 'number | null';
-    case 'boolean':     return 'boolean | null';
-    case 'combination': return 'string | number | boolean | null';
+// Prevents a child object from sharing its type name with the root interface.
+function disambiguate(typeName: string, rootName: string): string {
+  return typeName === rootName ? `${typeName}Item` : typeName;
+}
+
+function fieldTypeToTs(ft: string | undefined): string {
+  switch (ft) {
+    case 'integer':
+    case 'float':
+    case 'number':   return 'number';
+    case 'boolean':  return 'boolean';
+    case 'string':
+    case 'datetime': return 'string';
+    default:         return 'unknown';
   }
+}
+
+function fieldConfigToTs(cfg: FieldConfig): string {
+  const types = [...new Set(cfg.types.map(fieldTypeToTs))];
+  return types.join(' | ');
 }
 
 function fmtKey(key: string): string {

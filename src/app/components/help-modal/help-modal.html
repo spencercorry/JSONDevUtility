@@ -1,0 +1,37 @@
+<h2 mat-dialog-title>How to Use</h2>
+
+<mat-dialog-content class="help-content">
+  <ol class="steps">
+    <li>
+      <strong>Paste or type JSON</strong> into the left editor pane.
+    </li>
+    <li>
+      <strong>Beautify</strong> formats the JSON. Use the <code>2</code> / <code>4</code> indent toggle to control spacing — switching reruns Beautify automatically.
+    </li>
+    <li>
+      <strong>Submit</strong> opens the configuration modal. Set a root type name, configure any null fields (required before generating), and expand <em>Advanced Options</em> to override types or mark fields optional.
+    </li>
+    <li>
+      <strong>Generate</strong> produces typed output. Switch between the <em>TypeScript</em>, <em>Pydantic</em>, and <em>JS Object</em> tabs on the right to see each format.
+    </li>
+    <li>
+      <strong>Copy</strong> copies the current tab's output to the clipboard.
+    </li>
+    <li>
+      <strong>Clear</strong> (visible after the first Submit) empties the editor and resets all output.
+    </li>
+    <li>
+      <strong>Reopening Submit</strong> restores your previous root type name, field types, and optional flags so you only need to change what differs.
+    </li>
+  </ol>
+
+  <div class="tip">
+    <span class="tip-label">Tip</span>
+    Null fields in your JSON must have at least one type selected before Generate is enabled.
+    Use the <em>opt</em> button on any field to mark it optional in the output.
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-flat-button (click)="close()">Got it</button>
+</mat-dialog-actions>

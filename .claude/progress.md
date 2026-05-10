@@ -110,16 +110,33 @@
 ## TODO — Next Steps
 
 ### Deployment
-- Set GitHub remote and replace `REPO-NAME` in `build:gh-pages` script
+- Set GitHub remote and replace `REPO-NAME` in `build:gh-pages` script ✓ (repo: JSONDevUtility)
 
-### Feature Requests
-1. **Resizable panels** — replace fixed 50/50 split with a draggable divider; default to 50/50
-2. **Header** — fixed bar above both panels with space for a logo (name/logo TBD)
-3. **Help modal** — Help button opens a modal with usage instructions for the app
-4. **Update button** — after Submit, the Submit button becomes an Update button that silently re-runs generation with the same config (no modal); reverts to Submit after Clear
-5. **Clear button** — appears after Submit; clears the editor content, output cache, and generationConfig; resets Update → Submit
-6. **Generator tests** — unit tests (Karma/Jasmine) verifying correct output for TypeScript, Pydantic, and JS Object generators across key cases
-7. **Mobile support** — define and implement a responsive layout strategy for small screens
+### Planned Phases (scoped 2026-05-09, TDD updated in README)
+
+| Phase | Deliverable |
+|---|---|
+| A | Model types rework — `FieldType`, `FieldConfig`, updated `GenerationConfig` | ✓ 2026-05-10 |
+| B | Parser util — hierarchical `extractNullFields()`, new `extractAllLeafFields()`, `mergeObjects()` union fix | ✓ 2026-05-10 |
+| C | Generator rework — all 3 generators consume `fieldMap`; datetime; root collision fix | ✓ 2026-05-10 |
+| D | `JsonStateService` — `clearAll()`, pass `allLeafFields` to modal |
+| E | Submit modal rework — null fields + Advanced Options collapsible |
+| F | Left pane — action bar rearrange, indent toggle, Clear button |
+| G | Header + Help modal; AppComponent 3-row grid |
+| H | Generator unit tests (Karma/Jasmine) |
+
+### Decisions Locked
+- **Type system**: `FieldType` = integer | string | float | boolean | datetime (replaces old NullType)
+- **FieldConfig**: `{ types: FieldType[], optional: boolean }`
+- **GenerationConfig**: `{ rootTypeName, pydanticVersion, fieldMap: Record<string, FieldConfig> }`
+- **Modal**: one dialog, expandable; null fields (required) + Advanced Options (collapsible)
+- **Type buttons**: multi-select (union builder) per field
+- **Optional flag**: TS → `key?:`, Pydantic → `Optional[T] = None`
+- **Datetime**: TS → `string`, Pydantic → `datetime` (from datetime module)
+- **Clear**: empties editor completely; visible only post-Submit
+- **Header**: app name placeholder (TBD) left, Help button right
+- **Beautify controls**: indent size toggle (2/4 spaces) only; Submit + Clear right-aligned
+- **Mobile**: deferred
 
 ---
 

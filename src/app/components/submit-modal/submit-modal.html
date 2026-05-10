@@ -19,42 +19,56 @@
       </mat-button-toggle-group>
     </div>
 
-    <div class="toggle-row">
-      <span class="toggle-label">Null Handling</span>
-      <mat-button-toggle-group formControlName="nullMode">
-        <mat-button-toggle value="global">Global</mat-button-toggle>
-        <mat-button-toggle value="per-field">Per Field</mat-button-toggle>
-      </mat-button-toggle-group>
-    </div>
-
-    @if (isGlobal) {
-      <mat-form-field appearance="outline">
-        <mat-label>Null Type</mat-label>
-        <mat-select formControlName="globalNullType">
-          <mat-option value="string">string | null</mat-option>
-          <mat-option value="number">number | null</mat-option>
-          <mat-option value="boolean">boolean | null</mat-option>
-          <mat-option value="combination">string | number | boolean | null</mat-option>
-        </mat-select>
-      </mat-form-field>
-    } @else {
-      @if (data.nullFields.length === 0) {
-        <p class="no-nulls">No null fields detected in schema.</p>
-      } @else {
-        <div class="per-field-list" formGroupName="perFieldNullMap">
-          @for (field of data.nullFields; track field) {
-            <mat-form-field appearance="outline">
-              <mat-label>{{ field }}</mat-label>
-              <mat-select [formControlName]="field">
-                <mat-option value="string">string | null</mat-option>
-                <mat-option value="number">number | null</mat-option>
-                <mat-option value="boolean">boolean | null</mat-option>
-                <mat-option value="combination">string | number | boolean | null</mat-option>
-              </mat-select>
-            </mat-form-field>
-          }
+    @if (nullFields.length > 0) {
+      <div class="field-section">
+        <div class="section-header">
+          <span class="section-title">Null Fields</span>
+          <span class="section-hint">Pick at least one type per field</span>
         </div>
+        @for (path of nullFields; track path) {
+          <div class="field-row" [class.unresolved]="!isResolved(path)">
+            <span class="field-path" [title]="path">{{ path }}</span>
+            <div class="type-buttons">
+              @for (type of FIELD_TYPES; track type) {
+                <button type="button" class="type-btn" [class.active]="isTypeSelected(path, type)"
+                  (click)="toggleType(path, type)">{{ TYPE_LABELS[type] }}</button>
+              }
+            </div>
+            <button type="button" class="opt-btn" [class.active]="isOptional(path)"
+              (click)="toggleOptional(path)">opt</button>
+          </div>
+        }
+      </div>
+    }
+
+    <button type="button" class="advanced-toggle" (click)="advancedOpen = !advancedOpen">
+      <span class="chevron" [class.open]="advancedOpen">▶</span>
+      Advanced Options
+      @if (advancedFields.length > 0) {
+        <span class="adv-count">({{ advancedFields.length }})</span>
       }
+    </button>
+
+    @if (advancedOpen) {
+      <div class="field-section">
+        @if (advancedFields.length === 0) {
+          <p class="no-fields">No additional leaf fields to configure.</p>
+        } @else {
+          @for (path of advancedFields; track path) {
+            <div class="field-row">
+              <span class="field-path" [title]="path">{{ path }}</span>
+              <div class="type-buttons">
+                @for (type of FIELD_TYPES; track type) {
+                  <button type="button" class="type-btn" [class.active]="isTypeSelected(path, type)"
+                    (click)="toggleType(path, type)">{{ TYPE_LABELS[type] }}</button>
+                }
+              </div>
+              <button type="button" class="opt-btn" [class.active]="isOptional(path)"
+                (click)="toggleOptional(path)">opt</button>
+            </div>
+          }
+        }
+      </div>
     }
 
   </form>
@@ -62,5 +76,5 @@
 
 <mat-dialog-actions align="end">
   <button mat-button (click)="dismiss()">Cancel</button>
-  <button mat-flat-button [disabled]="form.invalid" (click)="confirm()">Generate</button>
+  <button mat-flat-button [disabled]="!canGenerate" (click)="confirm()">Generate</button>
 </mat-dialog-actions>
