@@ -72,12 +72,12 @@ describe('PydanticGeneratorService', () => {
     expect(out).toContain('from typing import Optional, Any');
   });
 
-  it('uses fieldMap type for a null field, still wraps in Optional', () => {
+  it('uses fieldMap type for a null field with nullable: uses str | None', () => {
     const out = svc.generate(
       tree({ value: null }, 'Root'),
-      cfg('Root', { value: { types: ['string'], optional: false } })
+      cfg('Root', { value: { types: ['string'], nullable: true, optional: false } })
     );
-    expect(out).toContain('value: Optional[str] = None');
+    expect(out).toContain('value: str | None');
     expect(out).not.toContain('Any');
   });
 
@@ -86,7 +86,7 @@ describe('PydanticGeneratorService', () => {
   it('wraps a non-null field in Optional and adds = None when optional is true', () => {
     const out = svc.generate(
       tree({ email: 'a@b.com' }, 'Root'),
-      cfg('Root', { email: { types: ['string'], optional: true } })
+      cfg('Root', { email: { types: ['string'], nullable: false, optional: true } })
     );
     expect(out).toContain('email: Optional[str] = None');
   });
@@ -94,22 +94,42 @@ describe('PydanticGeneratorService', () => {
   it('does not add Optional or = None for a non-optional field', () => {
     const out = svc.generate(
       tree({ name: 'Alice' }, 'Root'),
-      cfg('Root', { name: { types: ['string'], optional: false } })
+      cfg('Root', { name: { types: ['string'], nullable: false, optional: false } })
     );
     expect(out).toContain('name: str');
     expect(out).not.toContain('Optional');
     expect(out).not.toContain('= None');
   });
 
+  // ── Nullable flag ────────────────────────────────────────────────────────
+
+  it('emits str | None for nullable-only (no = None)', () => {
+    const out = svc.generate(
+      tree({ code: 'A' }, 'Root'),
+      cfg('Root', { code: { types: ['string'], nullable: true, optional: false } })
+    );
+    expect(out).toContain('code: str | None');
+    expect(out).not.toContain('= None');
+    expect(out).not.toContain('Optional');
+  });
+
+  it('emits Optional[str] = None when both nullable and optional are true', () => {
+    const out = svc.generate(
+      tree({ code: 'A' }, 'Root'),
+      cfg('Root', { code: { types: ['string'], nullable: true, optional: true } })
+    );
+    expect(out).toContain('code: Optional[str] = None');
+  });
+
   // ── Datetime ─────────────────────────────────────────────────────────────
 
   it('maps datetime FieldType to datetime and emits the datetime import', () => {
     const out = svc.generate(
-      tree({ createdAt: null }, 'Root'),
-      cfg('Root', { createdAt: { types: ['datetime'], optional: false } })
+      tree({ createdAt: 'now' }, 'Root'),
+      cfg('Root', { createdAt: { types: ['datetime'], nullable: false, optional: false } })
     );
     expect(out).toContain('from datetime import datetime');
-    expect(out).toContain('createdAt: Optional[datetime] = None');
+    expect(out).toContain('createdAt: datetime');
   });
 
   it('omits the datetime import when datetime type is not used', () => {
@@ -119,10 +139,10 @@ describe('PydanticGeneratorService', () => {
 
   // ── Union types ──────────────────────────────────────────────────────────
 
-  it('renders a union of multiple FieldTypes as Optional[Union[...]]', () => {
+  it('renders a union of multiple FieldTypes as Optional[Union[...]] when optional', () => {
     const out = svc.generate(
       tree({ id: null }, 'Root'),
-      cfg('Root', { id: { types: ['integer', 'string'], optional: false } })
+      cfg('Root', { id: { types: ['integer', 'string'], nullable: false, optional: true } })
     );
     expect(out).toContain('id: Optional[Union[int, str]] = None');
     expect(out).toContain('from typing import Optional, Union');
@@ -207,6 +227,16 @@ describe('PydanticGeneratorService', () => {
     const out = svc.generate(tree({ meta: {} }, 'Root'), cfg('Root'));
     expect(out).toContain('class Meta(BaseModel):');
     expect(out).toContain('    pass');
+  });
+
+  // ── Null elements in array ───────────────────────────────────────────────
+
+  it('preserves null element type as Optional when fieldMap overrides a null-containing array', () => {
+    const out = svc.generate(
+      tree({ tags: [null, 'hello'] }, 'Root'),
+      cfg('Root', { tags: { types: ['string'], nullable: false, optional: false } })
+    );
+    expect(out).toContain('tags: List[Optional[str]]');
   });
 
   // ── Array field with object items → List[ChildClass] ─────────────────────

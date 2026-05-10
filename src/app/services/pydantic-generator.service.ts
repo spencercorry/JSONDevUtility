@@ -75,28 +75,32 @@ export class PydanticGeneratorService {
     const fieldLines = node.children.map(child => {
       const childPath = basePath ? `${basePath}.${child.key}` : child.key;
       const fieldCfg = config.fieldMap[childPath];
+      let isOptional = fieldCfg?.optional ?? false;
+      const isNullable = fieldCfg?.nullable ?? false;
 
-      let typeStr: string;
-      let isOptional: boolean;
-
-      if (child.kind === 'null') {
-        // Null fields: always Optional in Pydantic; type from fieldMap or Any.
-        const baseType = fieldCfg?.types.length
-          ? fieldConfigToPy(fieldCfg, imports, datetime)
-          : (imports.add('Any'), 'Any');
-        imports.add('Optional');
-        typeStr = `Optional[${baseType}]`;
-        isOptional = true;
+      // For unresolved null fields with no types, fall back to Optional[Any] = None.
+      let baseType: string;
+      if (child.kind === 'null' && !fieldCfg?.types.length) {
+        imports.add('Any');
+        baseType = 'Any';
+        isOptional = true;  // sensible fallback when field type is unknown
       } else {
-        typeStr = this.typeStr(child, config, childPath, imports, datetime, rootName);
-        isOptional = fieldCfg?.optional ?? false;
-        if (isOptional) {
-          imports.add('Optional');
-          typeStr = `Optional[${typeStr}]`;
-        }
+        baseType = this.typeStr(child, config, childPath, imports, datetime, rootName);
       }
 
-      const defaultVal = isOptional ? ' = None' : '';
+      // 4-combination nullable/optional matrix.
+      let typeStr: string;
+      let defaultVal = '';
+      if (isOptional) {
+        imports.add('Optional');
+        typeStr = `Optional[${baseType}]`;
+        defaultVal = ' = None';
+      } else if (isNullable) {
+        typeStr = `${baseType} | None`;
+      } else {
+        typeStr = baseType;
+      }
+
       return `    ${pyField(child.key)}: ${typeStr}${defaultVal}`;
     });
 
@@ -121,7 +125,13 @@ export class PydanticGeneratorService {
     // fieldMap overrides take priority for all leaf nodes (not object/array).
     if (node.kind !== 'object' && node.kind !== 'array') {
       const fieldCfg = config.fieldMap[fieldPath];
-      if (fieldCfg?.types.length) return fieldConfigToPy(fieldCfg, imports, datetime);
+      if (fieldCfg?.types.length) {
+        const base = fieldConfigToPy(fieldCfg, imports, datetime);
+        // Null elements in an array union are always preserved — the user cannot remove them via the modal.
+        const hasNullElement = node.kind === 'union' && (node.unionMembers?.includes('null') ?? false);
+        if (hasNullElement) { imports.add('Optional'); return `Optional[${base}]`; }
+        return base;
+      }
     }
 
     switch (node.kind) {

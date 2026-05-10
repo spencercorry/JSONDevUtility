@@ -4,7 +4,8 @@ export type OutputTab = 'typescript' | 'pydantic' | 'jsObject';
 export type SchemaKind = 'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown';
 
 export interface FieldConfig {
-  types: FieldType[];
+  types:    FieldType[];
+  nullable: boolean;
   optional: boolean;
 }
 
@@ -22,6 +23,8 @@ export interface SchemaNode {
   itemType: SchemaNode | null;
   primitiveType?: FieldType;
   unionMembers?: string[];
+  inferredOptional?: boolean;
+  inferredNullable?: boolean;
 }
 
 export interface OutputCache {

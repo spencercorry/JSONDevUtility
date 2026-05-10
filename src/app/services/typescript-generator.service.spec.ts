@@ -50,7 +50,7 @@ describe('TypescriptGeneratorService', () => {
   it('uses fieldMap type for a null field', () => {
     const out = svc.generate(
       tree({ value: null }, 'Root'),
-      cfg('Root', { value: { types: ['string'], optional: false } })
+      cfg('Root', { value: { types: ['string'], nullable: false, optional: false } })
     );
     expect(out).toContain('value: string;');
     expect(out).not.toContain('unknown');
@@ -61,7 +61,7 @@ describe('TypescriptGeneratorService', () => {
   it('adds ? to the key when optional is true', () => {
     const out = svc.generate(
       tree({ email: 'a@b.com' }, 'Root'),
-      cfg('Root', { email: { types: ['string'], optional: true } })
+      cfg('Root', { email: { types: ['string'], nullable: false, optional: true } })
     );
     expect(out).toContain('email?: string;');
   });
@@ -69,10 +69,29 @@ describe('TypescriptGeneratorService', () => {
   it('does not add ? when optional is false', () => {
     const out = svc.generate(
       tree({ email: 'a@b.com' }, 'Root'),
-      cfg('Root', { email: { types: ['string'], optional: false } })
+      cfg('Root', { email: { types: ['string'], nullable: false, optional: false } })
     );
     expect(out).toContain('email: string;');
     expect(out).not.toContain('email?');
+  });
+
+  // ── Nullable flag ────────────────────────────────────────────────────────
+
+  it('appends | null to the type when nullable is true and optional is false', () => {
+    const out = svc.generate(
+      tree({ code: 'A' }, 'Root'),
+      cfg('Root', { code: { types: ['string'], nullable: true, optional: false } })
+    );
+    expect(out).toContain('code: string | null;');
+    expect(out).not.toContain('code?');
+  });
+
+  it('appends | null and ? when both nullable and optional are true', () => {
+    const out = svc.generate(
+      tree({ code: 'A' }, 'Root'),
+      cfg('Root', { code: { types: ['string'], nullable: true, optional: true } })
+    );
+    expect(out).toContain('code?: string | null;');
   });
 
   // ── Datetime ─────────────────────────────────────────────────────────────
@@ -80,7 +99,7 @@ describe('TypescriptGeneratorService', () => {
   it('maps datetime FieldType to string in TypeScript', () => {
     const out = svc.generate(
       tree({ createdAt: null }, 'Root'),
-      cfg('Root', { createdAt: { types: ['datetime'], optional: false } })
+      cfg('Root', { createdAt: { types: ['datetime'], nullable: false, optional: false } })
     );
     expect(out).toContain('createdAt: string;');
   });
@@ -90,7 +109,7 @@ describe('TypescriptGeneratorService', () => {
   it('renders a union of multiple FieldTypes', () => {
     const out = svc.generate(
       tree({ id: null }, 'Root'),
-      cfg('Root', { id: { types: ['integer', 'string'], optional: false } })
+      cfg('Root', { id: { types: ['integer', 'string'], nullable: false, optional: false } })
     );
     expect(out).toContain('id: number | string;');
   });
@@ -198,5 +217,23 @@ describe('TypescriptGeneratorService', () => {
       cfg('Root')
     );
     expect(out).toMatch(/ids: \(number \| string\)\[\]/);
+  });
+
+  it('puts null inside brackets for an array containing null elements', () => {
+    const out = svc.generate(
+      tree({ tags: [null, 'hello'] }, 'Root'),
+      cfg('Root')
+    );
+    expect(out).toContain('tags: (null | string)[]');
+    expect(out).not.toMatch(/\[\].*\| null/);
+  });
+
+  it('preserves null element type when fieldMap overrides the element type of a null-containing array', () => {
+    const out = svc.generate(
+      tree({ tags: [null, 'hello'] }, 'Root'),
+      cfg('Root', { tags: { types: ['string'], nullable: false, optional: false } })
+    );
+    expect(out).toContain('tags: (string | null)[]');
+    expect(out).not.toContain('(string)[]');
   });
 });

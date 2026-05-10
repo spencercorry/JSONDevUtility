@@ -70,8 +70,11 @@ export class TypescriptGeneratorService {
         const childPath = basePath ? `${basePath}.${child.key}` : child.key;
         const fieldCfg = config.fieldMap[childPath];
         const optional = fieldCfg?.optional ?? false;
+        const nullable = fieldCfg?.nullable ?? false;
         const key = fmtKey(child.key) + (optional ? '?' : '');
-        return `  ${key}: ${this.typeStr(child, config, childPath, rootName)};`;
+        const baseType = this.typeStr(child, config, childPath, rootName);
+        const finalType = nullable ? `${baseType} | null` : baseType;
+        return `  ${key}: ${finalType};`;
       })
       .join('\n');
     return `export interface ${node.typeName} {\n${props}\n}`;
@@ -86,7 +89,12 @@ export class TypescriptGeneratorService {
     // fieldMap overrides take priority for all leaf nodes (not object/array).
     if (node.kind !== 'object' && node.kind !== 'array') {
       const fieldCfg = config.fieldMap[fieldPath];
-      if (fieldCfg?.types.length) return fieldConfigToTs(fieldCfg);
+      if (fieldCfg?.types.length) {
+        const base = fieldConfigToTs(fieldCfg);
+        // Null elements in an array union are always preserved — the user cannot remove them via the modal.
+        const hasNullElement = node.kind === 'union' && (node.unionMembers?.includes('null') ?? false);
+        return hasNullElement ? `${base} | null` : base;
+      }
     }
 
     switch (node.kind) {
@@ -103,7 +111,7 @@ export class TypescriptGeneratorService {
       }
       case 'union': {
         const members = (node.unionMembers ?? []).map(m =>
-          m === 'null' ? 'unknown' : fieldTypeToTs(m as FieldType)
+          m === 'null' ? 'null' : fieldTypeToTs(m as FieldType)
         );
         return [...new Set(members)].join(' | ');
       }
