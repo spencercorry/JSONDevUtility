@@ -14,7 +14,7 @@ ng generate component components/foo --skip-tests  # scaffold a standalone compo
 
 For GitHub Pages deployment:
 ```bash
-npm run build:gh-pages   # builds with --base-href /JSONDevUtility/ and copies index.html → 404.html
+npx ng deploy --base-href=/JSONDevUtility/
 ```
 
 ## Architecture
