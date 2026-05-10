@@ -12,11 +12,7 @@
     </mat-form-field>
 
     <div class="toggle-row">
-      <span class="toggle-label">Pydantic Version</span>
-      <mat-button-toggle-group formControlName="pydanticVersion">
-        <mat-button-toggle value="v1">v1</mat-button-toggle>
-        <mat-button-toggle value="v2">v2</mat-button-toggle>
-      </mat-button-toggle-group>
+      <mat-checkbox [checked]="strictMode" (change)="strictMode = $event.checked">Pydantic Strict Mode</mat-checkbox>
     </div>
 
     @if (nullFields.length > 0) {

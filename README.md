@@ -153,7 +153,8 @@ type FieldType = 'integer' | 'string' | 'float' | 'boolean' | 'datetime'
 ```
 FieldConfig {
   types:    FieldType[]   // multi-select; empty array = unresolved null field (user must fill)
-  optional: boolean       // TS: key?:type  |  Pydantic: Optional[T] = None
+  nullable: boolean       // value can be null  → TS: T | null  |  Pydantic: T | None
+  optional: boolean       // key may be absent  → TS: key?: T   |  Pydantic: Optional[T] = None
 }
 ```
 
@@ -161,9 +162,9 @@ FieldConfig {
 
 ```
 GenerationConfig {
-  rootTypeName:    string
-  pydanticVersion: 'v1' | 'v2'
-  fieldMap:        Record<string, FieldConfig>
+  rootTypeName: string
+  strictMode:   boolean            // adds ConfigDict(strict=True) to each Pydantic class when true
+  fieldMap:     Record<string, FieldConfig>
   // Keys are full hierarchical dot-paths, e.g. "user.profile.age"
   // Covers both null fields (required, empty types[]) and leaf overrides (from Advanced Options)
 }
@@ -173,12 +174,14 @@ GenerationConfig {
 
 ```
 SchemaNode {
-  key:      string
-  typeName: string                  // resolved interface/class name
-  kind:     'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown'
-  children: SchemaNode[]            // populated for kind = 'object'
-  itemType: SchemaNode | null       // populated for kind = 'array'
-  unionMembers: string[]            // populated for kind = 'union' (e.g. ['integer','string'])
+  key:              string
+  typeName:         string                  // resolved interface/class name
+  kind:             'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown'
+  children:         SchemaNode[]            // populated for kind = 'object'
+  itemType:         SchemaNode | null       // populated for kind = 'array'
+  unionMembers:     string[]                // populated for kind = 'union' (e.g. ['integer','string'])
+  inferredOptional: boolean?                // true when field absent in some array objects
+  inferredNullable: boolean?                // true when field is null in some objects, non-null in others
 }
 ```
 
@@ -350,42 +353,52 @@ Opened via `MatDialog.open()`. Receives `SubmitModalData`; returns `GenerationCo
 
 ```typescript
 interface SubmitModalData {
-  nullFields:            string[];                    // hierarchical paths of null-typed fields
-  allLeafFields:         Record<string, FieldType[]>; // all leaf paths with inferred types
-  previousFieldMap?:     Record<string, FieldConfig>; // restored on reopen within same session
-  previousRootTypeName?: string;                      // restored on reopen
+  nullFields:            string[];                              // hierarchical paths of null-typed fields
+  allLeafFields:         Record<string, LeafFieldInfo>;        // all leaf paths with inferred types + flags
+  previousFieldMap?:     Record<string, FieldConfig>;          // restored on reopen within same session
+  previousRootTypeName?: string;                               // restored on reopen
+}
+
+// LeafFieldInfo (from json-parser.util):
+interface LeafFieldInfo {
+  types:            FieldType[];   // inferred primitive types (empty for pure-null fields)
+  inferredOptional: boolean;       // field absent in some array objects
+  inferredNullable: boolean;       // field null in some objects, non-null in others
 }
 ```
 
 **Form layout:**
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Configure Output                                    │
-├──────────────────────────────────────────────────────┤
-│  Root Type Name   [________________________]         │
-│                                                      │
-│  Pydantic Version   [ v1 ]  [ v2 ]                  │
-│                                                      │
-│  ── Null Fields (required) ──────────────────────   │
-│  user.score   [int][str][flt][bool][dt]   □ Optional │
-│  meta.tag     [int][str][flt][bool][dt]   □ Optional │
-│  ...                                                 │
-│                                                      │
-│  ▶ Advanced Options  ────────────────────────────   │
-│    (collapsed by default — click to expand)          │
-│    user.id    [int][str][flt][bool][dt]   □ Optional │
-│    user.name  [int][str][flt][bool][dt]   □ Optional │
-│    ...                                               │
-├──────────────────────────────────────────────────────┤
-│                              [Cancel]  [Generate →]  │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Configure Output                                            │
+├──────────────────────────────────────────────────────────────┤
+│  Root Type Name   [________________________]                 │
+│                                                              │
+│  ☐ Pydantic Strict Mode                                      │
+│                                                              │
+│  ── Null Fields (required) ──────────────────────────────   │
+│  user.score   [int][str][flt][bool][dt]   [null]  [opt]     │
+│  meta.tag     [int][str][flt][bool][dt]   [null]  [opt]     │
+│  ...                                                         │
+│                                                              │
+│  ▶ Advanced Options  ──────────────────────────────────────  │
+│    (collapsed by default — click to expand)                  │
+│    user.id    [int][str][flt][bool][dt]   [null]  [opt]     │
+│    user.name  [int][str][flt][bool][dt]   [null]  [opt]     │
+│    ...                                                       │
+├──────────────────────────────────────────────────────────────┤
+│                                  [Cancel]  [Generate →]      │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 **Behaviour:**
 - Null fields section is always visible; each row uses multi-select toggle buttons — the user must select ≥1 type per null field before Generate is enabled.
-- Advanced Options is a collapsible panel showing every leaf node. Buttons are pre-selected to the inferred type(s). The user may add/remove types (union building) and toggle the Optional checkbox.
-- The Optional checkbox on a field maps to `FieldConfig.optional = true`.
+- Advanced Options is a collapsible panel showing every leaf node. Buttons are pre-selected to the inferred type(s). The user may add/remove types (union building) and toggle `null` / `opt` independently.
+- **`null` toggle** → `FieldConfig.nullable = true` → value can be null (the field is always present). Output: `T | null` (TS) or `T | None` (Pydantic).
+- **`opt` toggle** → `FieldConfig.optional = true` → key may be absent entirely. Output: `key?: T` (TS) or `Optional[T] = None` (Pydantic).
+- Both flags are independent. When both are active: `key?: T | null` (TS) or `Optional[T] = None` (Pydantic).
+- `inferredNullable` / `inferredOptional` from the parser pre-check the respective buttons.
 - On confirm, the modal assembles a `GenerationConfig` from the form state and closes.
 
 #### 6.6 `HeaderComponent`
@@ -433,7 +446,7 @@ buildSchemaTree(value, key, path):
 
 **`extractNullFields(tree, prefix?)`** — returns `string[]` of full hierarchical dot-paths for all nodes where `kind === 'null'` (e.g. `"user.profile.age"`).
 
-**`extractAllLeafFields(tree, prefix?)`** — returns `Record<string, FieldType[]>` mapping every leaf node's dot-path to its inferred type(s). null nodes map to `[]`; union nodes map to their `unionMembers`; primitives map to their single `typeName` cast to `FieldType`.
+**`extractAllLeafFields(tree, prefix?)`** — returns `Record<string, LeafFieldInfo>` mapping every leaf node's dot-path to its inferred type(s) and inference flags. null nodes map to `types: []`; union nodes map to their non-null `unionMembers`; primitives map to their single `typeName` cast to `FieldType`. `inferredNullable` is `true` when a field was null in some array objects and non-null in others. `inferredOptional` is `true` when a field was absent from some array objects.
 
 #### 7.2 `SingularizeUtil` (`singularize.util.ts`)
 
@@ -450,7 +463,7 @@ One `export interface` block per unique object node. Root uses `rootTypeName`. N
 
 **Type mapping:**
 
-| FieldType | TypeScript output |
+| FieldType / Flag | TypeScript output |
 |---|---|
 | `integer` | `number` |
 | `float` | `number` |
@@ -458,7 +471,9 @@ One `export interface` block per unique object node. Root uses `rootTypeName`. N
 | `string` | `string` |
 | `datetime` | `string` |
 | union of N types | `T1 \| T2 \| ...` |
-| optional flag | `key?: type` (instead of `key: type`) |
+| `nullable: true` | `T \| null` (appended to type) |
+| `optional: true` | `key?: T` (question mark on key) |
+| both flags | `key?: T \| null` |
 
 **`fieldMap` lookup:** When generating a field, look up its full dot-path in `config.fieldMap`. If found, use `FieldConfig.types` to build the type string and apply the optional flag. If not found, use the inferred type from the `SchemaNode`.
 
@@ -492,7 +507,7 @@ Classes emitted in dependency-first order (children before parents). Only used `
 
 **Type mapping:**
 
-| FieldType | Python output |
+| FieldType / Flag | Python output |
 |---|---|
 | `integer` | `int` |
 | `float` | `float` |
@@ -500,7 +515,9 @@ Classes emitted in dependency-first order (children before parents). Only used `
 | `string` | `str` |
 | `datetime` | `datetime` (adds `from datetime import datetime`) |
 | union of N types | `Union[T1, T2, ...]` |
-| optional flag | `Optional[T] = None` |
+| `nullable: true, optional: false` | `T \| None` |
+| `optional: true` (nullable or not) | `Optional[T] = None` |
+| neither flag | bare `T` |
 
 **`fieldMap` lookup:** Same dot-path lookup as TypeScript generator. Optional flag → `Optional[T] = None`.
 
@@ -529,7 +546,7 @@ class Root(BaseModel):
     count: int
 ```
 
-**v2 adds** `model_config = ConfigDict(strict=True)` to each class.
+**Strict Mode** (checkbox) adds `model_config = ConfigDict(strict=True)` to each class and imports `ConfigDict`.
 
 #### 7.5 `JsObjectGeneratorService`
 
@@ -785,3 +802,4 @@ In `angular.json` assets array:
 | F | Left pane — action bar rearrange, reactive indent size toggle, Clear button |
 | G | Header (TypeCast wordmark) + Help modal; `AppComponent` 3-row grid layout |
 | H | Unit tests — 90 Karma/Jasmine tests across parser util and all 3 generators |
+| I | Nullable vs optional distinction — independent `null` / `opt` toggles; 4-combination Pydantic matrix; `inferredNullable` / `inferredOptional` inference from array shapes; 106 tests total |

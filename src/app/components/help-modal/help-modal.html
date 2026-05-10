@@ -9,7 +9,7 @@
       <strong>Beautify</strong> formats the JSON. Use the <code>2</code> / <code>4</code> indent toggle to control spacing — switching reruns Beautify automatically.
     </li>
     <li>
-      <strong>Submit</strong> opens the configuration modal. Set a root type name, configure any null fields (required before generating), and expand <em>Advanced Options</em> to override types or mark fields optional.
+      <strong>Submit</strong> opens the configuration modal. Set a root type name, configure any null fields (required before generating), and expand <em>Advanced Options</em> to override types or mark fields nullable / optional. Use <code>null</code> when a value can be null; use <code>opt</code> when a key may be absent entirely.
     </li>
     <li>
       <strong>Generate</strong> produces typed output. Switch between the <em>TypeScript</em>, <em>Pydantic</em>, and <em>JS Object</em> tabs on the right to see each format.
@@ -28,7 +28,9 @@
   <div class="tip">
     <span class="tip-label">Tip</span>
     Null fields in your JSON must have at least one type selected before Generate is enabled.
-    Use the <em>opt</em> button on any field to mark it optional in the output.
+    Use the <em>null</em> button to mark a field's value as nullable (<code>T | null</code>),
+    and the <em>opt</em> button to mark the key itself as optional (<code>key?</code> / <code>Optional[T]</code>).
+    Both can be active at once.
   </div>
 </mat-dialog-content>
 

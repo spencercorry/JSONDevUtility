@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { FieldConfig, GenerationConfig, PydanticVersion, SchemaNode } from '../models/generation-config.model';
+import { FieldConfig, GenerationConfig, SchemaNode } from '../models/generation-config.model';
 import { buildSchemaTree } from '../utils/json-parser.util';
 import { PydanticGeneratorService } from './pydantic-generator.service';
 
@@ -8,9 +8,9 @@ import { PydanticGeneratorService } from './pydantic-generator.service';
 function cfg(
   rootTypeName: string,
   fieldMap: Record<string, FieldConfig> = {},
-  pydanticVersion: PydanticVersion = 'v1'
+  strictMode = false
 ): GenerationConfig {
-  return { rootTypeName, pydanticVersion, fieldMap };
+  return { rootTypeName, strictMode, fieldMap };
 }
 
 function tree(value: unknown, rootTypeName: string): SchemaNode {
@@ -52,14 +52,14 @@ describe('PydanticGeneratorService', () => {
 
   // ── v1 vs v2 ─────────────────────────────────────────────────────────────
 
-  it('does not add model_config for v1', () => {
-    const out = svc.generate(tree({ x: 1 }, 'Root'), cfg('Root', {}, 'v1'));
+  it('does not add model_config when strict mode is off', () => {
+    const out = svc.generate(tree({ x: 1 }, 'Root'), cfg('Root', {}, false));
     expect(out).not.toContain('model_config');
     expect(out).not.toContain('ConfigDict');
   });
 
-  it('adds model_config = ConfigDict(strict=True) for v2', () => {
-    const out = svc.generate(tree({ x: 1 }, 'Root'), cfg('Root', {}, 'v2'));
+  it('adds model_config = ConfigDict(strict=True) when strict mode is on', () => {
+    const out = svc.generate(tree({ x: 1 }, 'Root'), cfg('Root', {}, true));
     expect(out).toContain('model_config = ConfigDict(strict=True)');
     expect(out).toContain('from pydantic import BaseModel, ConfigDict');
   });

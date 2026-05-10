@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { FieldConfig, GenerationConfig, PydanticVersion, SchemaNode } from '../models/generation-config.model';
+import { FieldConfig, GenerationConfig, SchemaNode } from '../models/generation-config.model';
 import { buildSchemaTree } from '../utils/json-parser.util';
 import { TypescriptGeneratorService } from './typescript-generator.service';
 
@@ -8,9 +8,9 @@ import { TypescriptGeneratorService } from './typescript-generator.service';
 function cfg(
   rootTypeName: string,
   fieldMap: Record<string, FieldConfig> = {},
-  pydanticVersion: PydanticVersion = 'v1'
+  strictMode = false
 ): GenerationConfig {
-  return { rootTypeName, pydanticVersion, fieldMap };
+  return { rootTypeName, strictMode, fieldMap };
 }
 
 function tree(value: unknown, rootTypeName: string): SchemaNode {

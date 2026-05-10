@@ -2,10 +2,11 @@ import { Component, inject } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { FieldConfig, FieldType, GenerationConfig, PydanticVersion } from '../../models/generation-config.model';
+import { FieldConfig, FieldType, GenerationConfig } from '../../models/generation-config.model';
 import { LeafFieldInfo } from '../../utils/json-parser.util';
 
 export interface SubmitModalData {
@@ -13,6 +14,7 @@ export interface SubmitModalData {
   allLeafFields?: Record<string, LeafFieldInfo>;
   previousFieldMap?: Record<string, FieldConfig>;
   previousRootTypeName?: string;
+  previousStrictMode?: boolean;
 }
 
 @Component({
@@ -24,6 +26,7 @@ export interface SubmitModalData {
     MatInputModule,
     MatButtonToggleModule,
     MatButtonModule,
+    MatCheckboxModule,
   ],
   templateUrl: './submit-modal.html',
   styleUrl: './submit-modal.scss',
@@ -35,10 +38,10 @@ export class SubmitModalComponent {
 
   protected readonly form = this.fb.group({
     rootTypeName: [this.data.previousRootTypeName ?? 'Root', nonEmpty],
-    pydanticVersion: ['v1' as PydanticVersion],
   });
 
   protected advancedOpen = false;
+  protected strictMode = this.data.previousStrictMode ?? false;
 
   protected readonly FIELD_TYPES: FieldType[] = ['integer', 'string', 'float', 'boolean', 'datetime'];
   protected readonly TYPE_LABELS: Record<FieldType, string> = {
@@ -133,7 +136,7 @@ export class SubmitModalComponent {
     }
     const config: GenerationConfig = {
       rootTypeName: v.rootTypeName!.trim(),
-      pydanticVersion: v.pydanticVersion as PydanticVersion,
+      strictMode: this.strictMode,
       fieldMap,
     };
     this.dialogRef.close(config);

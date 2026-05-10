@@ -1,5 +1,4 @@
 export type FieldType = 'integer' | 'string' | 'float' | 'boolean' | 'datetime';
-export type PydanticVersion = 'v1' | 'v2';
 export type OutputTab = 'typescript' | 'pydantic' | 'jsObject';
 export type SchemaKind = 'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown';
 
@@ -11,7 +10,7 @@ export interface FieldConfig {
 
 export interface GenerationConfig {
   rootTypeName: string;
-  pydanticVersion: PydanticVersion;
+  strictMode: boolean;
   fieldMap: Record<string, FieldConfig>;
 }
 

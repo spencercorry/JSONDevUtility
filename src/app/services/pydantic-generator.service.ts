@@ -105,7 +105,7 @@ export class PydanticGeneratorService {
     });
 
     const bodyLines: string[] = [];
-    if (config.pydanticVersion === 'v2') {
+    if (config.strictMode) {
       bodyLines.push('    model_config = ConfigDict(strict=True)');
     }
     bodyLines.push(...fieldLines);
@@ -179,7 +179,7 @@ function buildOutput(
 ): string {
   const typingImports = ['Optional', 'List', 'Union', 'Any'].filter(i => imports.has(i));
   const pydanticImports =
-    config.pydanticVersion === 'v2' ? ['BaseModel', 'ConfigDict'] : ['BaseModel'];
+    config.strictMode ? ['BaseModel', 'ConfigDict'] : ['BaseModel'];
 
   const importLines: string[] = [];
   if (needsDatetime) importLines.push('from datetime import datetime');

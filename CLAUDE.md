@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ng serve              # dev server at http://localhost:4200
 ng build              # production build → dist/jsonapp/
 ng build --watch --configuration development   # watch mode
-ng test               # Karma/Jasmine unit tests (90 tests, ChromeHeadless)
+ng test               # Karma/Jasmine unit tests (106 tests, ChromeHeadless)
 ng generate component components/foo --skip-tests  # scaffold a standalone component with SCSS
 ```
 
@@ -52,16 +52,19 @@ AppComponent              ← 3-row CSS Grid (header / left+right panes)
 
 `GenerationConfig` (output of SubmitModalComponent):
 ```ts
-{ rootTypeName: string; pydanticVersion: 'v1' | 'v2';
+{ rootTypeName: string; strictMode: boolean;
   fieldMap: Record<string, FieldConfig>; }
 // fieldMap keys are full hierarchical dot-paths, e.g. "user.profile.age"
+// strictMode: true → adds model_config = ConfigDict(strict=True) to each Pydantic class
 ```
 
 `FieldConfig`:
 ```ts
-{ types: FieldType[]; optional: boolean; }
+{ types: FieldType[]; nullable: boolean; optional: boolean; }
 // FieldType = 'integer' | 'string' | 'float' | 'boolean' | 'datetime'
-// empty types[] = unresolved null field
+// nullable: value can be null  → TS: T | null  |  Pydantic: T | None
+// optional: key may be absent  → TS: key?: T   |  Pydantic: Optional[T] = None
+// empty types[] = unresolved null field (user must fill before Generate is enabled)
 ```
 
 `SchemaNode` (internal AST from json-parser.util):
@@ -70,7 +73,10 @@ AppComponent              ← 3-row CSS Grid (header / left+right panes)
   kind: 'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown';
   primitiveType?: FieldType;
   children: SchemaNode[]; itemType: SchemaNode | null;
-  unionMembers?: string[]; }
+  unionMembers?: string[];
+  inferredOptional?: boolean;   // true when field absent in some array objects
+  inferredNullable?: boolean;   // true when field is null in some objects, non-null in others
+}
 ```
 
 `OutputCache`:
