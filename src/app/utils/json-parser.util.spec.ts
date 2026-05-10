@@ -1,4 +1,4 @@
-import { buildSchemaTree, extractAllLeafFields, extractNullFields } from './json-parser.util';
+import { buildSchemaTree, extractAllLeafFields, extractNullFields, LeafFieldInfo } from './json-parser.util';
 
 describe('json-parser.util', () => {
 
@@ -161,6 +161,56 @@ describe('json-parser.util', () => {
       expect(userField?.kind).toBe('object');
       expect(userField?.children[0].key).toBe('name');
     });
+
+    it('sets inferredOptional on a field that is absent in some objects', () => {
+      const n = buildSchemaTree(
+        [{ id: 1, name: 'Alice' }, { id: 2 }],
+        'items', 'Items'
+      );
+      const idField = n.itemType?.children.find(c => c.key === 'id');
+      const nameField = n.itemType?.children.find(c => c.key === 'name');
+      expect(idField?.inferredOptional).toBeFalsy();
+      expect(nameField?.inferredOptional).toBeTrue();
+    });
+
+    it('does not set inferredOptional on a field present in all objects', () => {
+      const n = buildSchemaTree(
+        [{ id: 1 }, { id: 2 }, { id: 3 }],
+        'items', 'Items'
+      );
+      const idField = n.itemType?.children.find(c => c.key === 'id');
+      expect(idField?.inferredOptional).toBeFalsy();
+    });
+
+    it('sets inferredOptional on a null field that is absent in some objects', () => {
+      const n = buildSchemaTree(
+        [{ type: 'login', details: null }, { type: 'logout' }],
+        'items', 'Items'
+      );
+      const detailsField = n.itemType?.children.find(c => c.key === 'details');
+      expect(detailsField?.kind).toBe('null');
+      expect(detailsField?.inferredOptional).toBeTrue();
+    });
+
+    it('sets inferredNullable when a field is null in some objects and non-null in others', () => {
+      const n = buildSchemaTree(
+        [{ id: 1, code: null }, { id: 2, code: 'E001' }],
+        'items', 'Items'
+      );
+      const codeField = n.itemType?.children.find(c => c.key === 'code');
+      expect(codeField?.inferredNullable).toBeTrue();
+      expect(codeField?.kind).toBe('primitive');
+      expect(codeField?.primitiveType).toBe('string');
+    });
+
+    it('does not set inferredNullable when all instances have the same non-null type', () => {
+      const n = buildSchemaTree(
+        [{ code: 'A' }, { code: 'B' }],
+        'items', 'Items'
+      );
+      const codeField = n.itemType?.children.find(c => c.key === 'code');
+      expect(codeField?.inferredNullable).toBeFalsy();
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -218,27 +268,27 @@ describe('json-parser.util', () => {
         '', 'Root'
       );
       const fields = extractAllLeafFields(t);
-      expect(fields['name']).toEqual(['string']);
-      expect(fields['age']).toEqual(['integer']);
-      expect(fields['score']).toEqual(['float']);
-      expect(fields['active']).toEqual(['boolean']);
+      expect(fields['name'].types).toEqual(['string']);
+      expect(fields['age'].types).toEqual(['integer']);
+      expect(fields['score'].types).toEqual(['float']);
+      expect(fields['active'].types).toEqual(['boolean']);
     });
 
     it('maps a null field to an empty types array', () => {
       const t = buildSchemaTree({ value: null }, '', 'Root');
-      expect(extractAllLeafFields(t)['value']).toEqual([]);
+      expect(extractAllLeafFields(t)['value'].types).toEqual([]);
     });
 
     it('uses dot-separated paths for nested object fields', () => {
       const t = buildSchemaTree({ user: { name: 'Alice' } }, '', 'Root');
       const fields = extractAllLeafFields(t);
-      expect(fields['user.name']).toEqual(['string']);
+      expect(fields['user.name'].types).toEqual(['string']);
       expect('user' in fields).toBeFalse();
     });
 
     it('maps an array field to its item type', () => {
       const t = buildSchemaTree({ tags: ['a', 'b'] }, '', 'Root');
-      expect(extractAllLeafFields(t)['tags']).toEqual(['string']);
+      expect(extractAllLeafFields(t)['tags'].types).toEqual(['string']);
     });
 
     it('maps a union array field to multiple FieldTypes', () => {
@@ -247,8 +297,8 @@ describe('json-parser.util', () => {
         '', 'Root'
       );
       const fields = extractAllLeafFields(t);
-      expect(fields['id']).toContain('integer');
-      expect(fields['id']).toContain('string');
+      expect(fields['id'].types).toContain('integer');
+      expect(fields['id'].types).toContain('string');
     });
 
     it('does not include intermediate object nodes as leaf entries', () => {
@@ -256,7 +306,41 @@ describe('json-parser.util', () => {
       const fields = extractAllLeafFields(t);
       expect('a' in fields).toBeFalse();
       expect('a.b' in fields).toBeFalse();
-      expect(fields['a.b.c']).toEqual(['integer']);
+      expect(fields['a.b.c'].types).toEqual(['integer']);
+    });
+
+    it('sets inferredNullable when a field is null in some objects and string in others', () => {
+      const t = buildSchemaTree(
+        [{ id: 1, code: null }, { id: 2, code: 'E001' }],
+        '', 'Root'
+      );
+      const fields = extractAllLeafFields(t);
+      expect(fields['code'].inferredNullable).toBeTrue();
+      expect(fields['code'].types).toEqual(['string']);
+    });
+
+    it('does not set inferredNullable for null elements inside an array (null belongs in element type, not array nullability)', () => {
+      const t = buildSchemaTree({ tags: [null, 'hello'] }, '', 'Root');
+      const fields = extractAllLeafFields(t);
+      expect(fields['tags'].inferredNullable).toBeFalse();
+      expect(fields['tags'].types).toContain('string');
+    });
+
+    it('sets inferredOptional for a field absent in some objects', () => {
+      const t = buildSchemaTree(
+        [{ id: 1, name: 'Alice' }, { id: 2 }],
+        '', 'Root'
+      );
+      const fields = extractAllLeafFields(t);
+      expect(fields['name'].inferredOptional).toBeTrue();
+      expect(fields['id'].inferredOptional).toBeFalsy();
+    });
+
+    it('returns inferredOptional and inferredNullable as false for normal fields', () => {
+      const t = buildSchemaTree({ name: 'Alice' }, '', 'Root');
+      const info: LeafFieldInfo = extractAllLeafFields(t)['name'];
+      expect(info.inferredOptional).toBeFalse();
+      expect(info.inferredNullable).toBeFalse();
     });
   });
 });

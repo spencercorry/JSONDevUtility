@@ -2,16 +2,19 @@ import { Component, inject } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { FieldConfig, FieldType, GenerationConfig, PydanticVersion } from '../../models/generation-config.model';
+import { FieldConfig, FieldType, GenerationConfig } from '../../models/generation-config.model';
+import { LeafFieldInfo } from '../../utils/json-parser.util';
 
 export interface SubmitModalData {
   nullFields: string[];
-  allLeafFields?: Record<string, FieldType[]>;
+  allLeafFields?: Record<string, LeafFieldInfo>;
   previousFieldMap?: Record<string, FieldConfig>;
   previousRootTypeName?: string;
+  previousStrictMode?: boolean;
 }
 
 @Component({
@@ -23,6 +26,7 @@ export interface SubmitModalData {
     MatInputModule,
     MatButtonToggleModule,
     MatButtonModule,
+    MatCheckboxModule,
   ],
   templateUrl: './submit-modal.html',
   styleUrl: './submit-modal.scss',
@@ -34,10 +38,10 @@ export class SubmitModalComponent {
 
   protected readonly form = this.fb.group({
     rootTypeName: [this.data.previousRootTypeName ?? 'Root', nonEmpty],
-    pydanticVersion: ['v1' as PydanticVersion],
   });
 
   protected advancedOpen = false;
+  protected strictMode = this.data.previousStrictMode ?? false;
 
   protected readonly FIELD_TYPES: FieldType[] = ['integer', 'string', 'float', 'boolean', 'datetime'];
   protected readonly TYPE_LABELS: Record<FieldType, string> = {
@@ -53,6 +57,7 @@ export class SubmitModalComponent {
 
   // Mutable state — default CD re-evaluates methods on every event.
   private readonly fieldTypesMap: Record<string, FieldType[]> = {};
+  private readonly fieldNullableMap: Record<string, boolean> = {};
   private readonly fieldOptionalMap: Record<string, boolean> = {};
 
   constructor() {
@@ -63,13 +68,16 @@ export class SubmitModalComponent {
 
     for (const path of this.nullFields) {
       this.fieldTypesMap[path] = prevMap[path]?.types ?? [];
-      this.fieldOptionalMap[path] = prevMap[path]?.optional ?? true;
+      this.fieldNullableMap[path] = prevMap[path]?.nullable ?? true;
+      this.fieldOptionalMap[path] = prevMap[path]?.optional ?? (allLeafFields[path]?.inferredOptional ?? false);
     }
 
     this.advancedFields = Object.keys(allLeafFields).filter(p => !nullSet.has(p));
     for (const path of this.advancedFields) {
-      this.fieldTypesMap[path] = prevMap[path]?.types ?? [...(allLeafFields[path] ?? [])];
-      this.fieldOptionalMap[path] = prevMap[path]?.optional ?? false;
+      const info = allLeafFields[path];
+      this.fieldTypesMap[path] = prevMap[path]?.types ?? [...(info?.types ?? [])];
+      this.fieldNullableMap[path] = prevMap[path]?.nullable ?? (info?.inferredNullable ?? false);
+      this.fieldOptionalMap[path] = prevMap[path]?.optional ?? (info?.inferredOptional ?? false);
     }
   }
 
@@ -81,6 +89,14 @@ export class SubmitModalComponent {
 
   protected isTypeSelected(path: string, type: FieldType): boolean {
     return (this.fieldTypesMap[path] ?? []).includes(type);
+  }
+
+  protected toggleNullable(path: string): void {
+    this.fieldNullableMap[path] = !(this.fieldNullableMap[path] ?? false);
+  }
+
+  protected isNullable(path: string): boolean {
+    return this.fieldNullableMap[path] ?? false;
   }
 
   protected toggleOptional(path: string): void {
@@ -112,14 +128,15 @@ export class SubmitModalComponent {
     const fieldMap: Record<string, FieldConfig> = {};
     for (const path of [...this.nullFields, ...this.advancedFields]) {
       const types = this.fieldTypesMap[path] ?? [];
+      const nullable = this.fieldNullableMap[path] ?? false;
       const optional = this.fieldOptionalMap[path] ?? false;
-      if (types.length > 0 || optional) {
-        fieldMap[path] = { types, optional };
+      if (types.length > 0 || nullable || optional) {
+        fieldMap[path] = { types, nullable, optional };
       }
     }
     const config: GenerationConfig = {
       rootTypeName: v.rootTypeName!.trim(),
-      pydanticVersion: v.pydanticVersion as PydanticVersion,
+      strictMode: this.strictMode,
       fieldMap,
     };
     this.dialogRef.close(config);

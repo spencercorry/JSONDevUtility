@@ -24,10 +24,16 @@ export function extractNullFields(tree: SchemaNode): string[] {
   return paths;
 }
 
-// Returns every leaf field path mapped to its inferred FieldType(s).
-// null-typed leaves map to [] (no inferred type — user must configure).
-export function extractAllLeafFields(tree: SchemaNode): Record<string, FieldType[]> {
-  const result: Record<string, FieldType[]> = {};
+export interface LeafFieldInfo {
+  types: FieldType[];
+  inferredOptional: boolean;
+  inferredNullable: boolean;
+}
+
+// Returns every leaf field path mapped to its inferred type info.
+// null-typed leaves have types:[] (user must configure); inferredNullable/inferredOptional are pre-fill hints.
+export function extractAllLeafFields(tree: SchemaNode): Record<string, LeafFieldInfo> {
+  const result: Record<string, LeafFieldInfo> = {};
   collectLeafFields(tree, result, '');
   return result;
 }
@@ -52,23 +58,27 @@ function collectArrayItemNulls(itemType: SchemaNode, out: string[], arrayPath: s
 
 function collectLeafFields(
   node: SchemaNode,
-  out: Record<string, FieldType[]>,
+  out: Record<string, LeafFieldInfo>,
   parentPath: string
 ): void {
   const nodePath = parentPath && node.key ? `${parentPath}.${node.key}` : (node.key || parentPath);
+  const inferredOptional = node.inferredOptional ?? false;
+  const inferredNullable = node.inferredNullable ?? false;
 
   switch (node.kind) {
     case 'primitive':
-      if (node.key) out[nodePath] = node.primitiveType ? [node.primitiveType] : [];
+      if (node.key) out[nodePath] = { types: node.primitiveType ? [node.primitiveType] : [], inferredOptional, inferredNullable };
       break;
     case 'null':
-      if (node.key) out[nodePath] = [];
+      if (node.key) out[nodePath] = { types: [], inferredOptional, inferredNullable };
       break;
-    case 'union':
-      if (node.key) out[nodePath] = unionMembersToFieldTypes(node.unionMembers ?? []);
+    case 'union': {
+      const hasNullMember = node.unionMembers?.includes('null') ?? false;
+      if (node.key) out[nodePath] = { types: unionMembersToFieldTypes(node.unionMembers ?? []), inferredOptional, inferredNullable: inferredNullable || hasNullMember };
       break;
+    }
     case 'unknown':
-      if (node.key) out[nodePath] = [];
+      if (node.key) out[nodePath] = { types: [], inferredOptional, inferredNullable };
       break;
     case 'object':
       for (const child of node.children) collectLeafFields(child, out, nodePath);
@@ -81,21 +91,24 @@ function collectLeafFields(
 
 function collectArrayItemLeafFields(
   itemType: SchemaNode,
-  out: Record<string, FieldType[]>,
+  out: Record<string, LeafFieldInfo>,
   arrayPath: string
 ): void {
+  const inferredOptional = itemType.inferredOptional ?? false;
+  const inferredNullable = itemType.inferredNullable ?? false;
+
   switch (itemType.kind) {
     case 'primitive':
-      out[arrayPath] = itemType.primitiveType ? [itemType.primitiveType] : [];
+      out[arrayPath] = { types: itemType.primitiveType ? [itemType.primitiveType] : [], inferredOptional, inferredNullable };
       break;
     case 'null':
-      out[arrayPath] = [];
+      out[arrayPath] = { types: [], inferredOptional, inferredNullable };
       break;
     case 'union':
-      out[arrayPath] = unionMembersToFieldTypes(itemType.unionMembers ?? []);
+      out[arrayPath] = { types: unionMembersToFieldTypes(itemType.unionMembers ?? []), inferredOptional, inferredNullable };
       break;
     case 'unknown':
-      out[arrayPath] = [];
+      out[arrayPath] = { types: [], inferredOptional, inferredNullable };
       break;
     case 'object':
       for (const child of itemType.children) collectLeafFields(child, out, arrayPath);
@@ -174,6 +187,7 @@ function mergeObjectSchemas(objects: Record<string, unknown>[], key: string, typ
 }
 
 function mergeSchemaObjectNodes(nodes: SchemaNode[], key: string, typeName: string): SchemaNode {
+  const totalObjects = nodes.length;
   const fieldBuckets = new Map<string, SchemaNode[]>();
   for (const node of nodes) {
     for (const child of node.children) {
@@ -181,7 +195,11 @@ function mergeSchemaObjectNodes(nodes: SchemaNode[], key: string, typeName: stri
       fieldBuckets.get(child.key)!.push(child);
     }
   }
-  const mergedChildren = [...fieldBuckets.entries()].map(([k, nodes]) => mergeFieldNodes(nodes, k));
+  const mergedChildren = [...fieldBuckets.entries()].map(([k, bucket]) => {
+    const merged = mergeFieldNodes(bucket, k);
+    if (bucket.length < totalObjects) merged.inferredOptional = true;
+    return merged;
+  });
   return { key, typeName, kind: 'object', children: mergedChildren, itemType: null };
 }
 
@@ -193,6 +211,9 @@ function mergeFieldNodes(nodes: SchemaNode[], key: string): SchemaNode {
 
   // All null → null leaf.
   if (nonNullNodes.length === 0) return leaf(key, 'null', 'null');
+
+  // When some nodes are null and others are not, the result is inferredNullable.
+  const hasNullSiblings = nullNodes.length > 0;
 
   // Partition non-null nodes by kind.
   const primitiveTypes = new Set<FieldType>();
@@ -219,7 +240,9 @@ function mergeFieldNodes(nodes: SchemaNode[], key: string): SchemaNode {
 
   // All objects → merge recursively.
   if (objectNodes.length === nonNullNodes.length) {
-    return mergeSchemaObjectNodes(objectNodes, key, objectNodes[0].typeName);
+    const result = mergeSchemaObjectNodes(objectNodes, key, objectNodes[0].typeName);
+    if (hasNullSiblings) result.inferredNullable = true;
+    return result;
   }
 
   // All arrays → merge item types recursively so field stays typed as T[].
@@ -228,10 +251,14 @@ function mergeFieldNodes(nodes: SchemaNode[], key: string): SchemaNode {
       .map(n => n.itemType)
       .filter((t): t is SchemaNode => t !== null);
     if (itemTypes.length === 0) {
-      return { key, typeName: 'unknown[]', kind: 'array', children: [], itemType: leaf(key, 'unknown', 'unknown') };
+      const result: SchemaNode = { key, typeName: 'unknown[]', kind: 'array', children: [], itemType: leaf(key, 'unknown', 'unknown') };
+      if (hasNullSiblings) result.inferredNullable = true;
+      return result;
     }
     const mergedItem = itemTypes.length === 1 ? itemTypes[0] : mergeFieldNodes(itemTypes, key);
-    return { key, typeName: `${mergedItem.typeName}[]`, kind: 'array', children: [], itemType: mergedItem };
+    const result: SchemaNode = { key, typeName: `${mergedItem.typeName}[]`, kind: 'array', children: [], itemType: mergedItem };
+    if (hasNullSiblings) result.inferredNullable = true;
+    return result;
   }
 
   // Numeric promotion: integer + float → float.
@@ -243,14 +270,18 @@ function mergeFieldNodes(nodes: SchemaNode[], key: string): SchemaNode {
   // Resolved to a single primitive.
   if (members.length === 1 && primitiveTypes.size === 1) {
     const pt = [...primitiveTypes][0];
-    return leaf(key, pt, 'primitive', { primitiveType: pt });
+    const result = leaf(key, pt, 'primitive', { primitiveType: pt });
+    if (hasNullSiblings) result.inferredNullable = true;
+    return result;
   }
 
   // True union of multiple types.
-  return {
+  const result: SchemaNode = {
     key, typeName: members.join(' | '), kind: 'union',
     children: [], itemType: null, unionMembers: members,
   };
+  if (hasNullSiblings) result.inferredNullable = true;
+  return result;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────

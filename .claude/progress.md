@@ -166,11 +166,56 @@
 - Help modal: beta warning banner added at bottom (red-accented callout)
 - README, CLAUDE.md, and progress.md updated to reflect current state
 
+### Phase I — Nullable/Optional Distinction + Inferred Flags — 2026-05-10
+- `FieldConfig` now has `nullable: boolean` (separate from `optional`)
+- `SchemaNode` now has `inferredOptional?: boolean` and `inferredNullable?: boolean`
+- `mergeFieldNodes()`: when a field is `null` in some objects and non-null in others → `inferredNullable: true` on the merged node
+- `mergeSchemaObjectNodes()`: tracks field presence; fields absent in some objects → `inferredOptional: true`
+- `extractAllLeafFields()` returns `LeafFieldInfo { types, inferredOptional, inferredNullable }` instead of bare `FieldType[]`
+- Submit modal: added independent **null** toggle button per field (alongside existing **opt**)
+  - Null fields default to `nullable: true, optional: true`
+  - Advanced fields pre-check based on inferred flags from parser
+  - Session memory restores `nullable` from previous config
+- TypeScript generator: `nullable: true` → appends `| null` to type; both → `field?: string | null`
+- Pydantic generator: 4-combination matrix implemented
+  - `nullable only` → `str | None` (no `= None`)
+  - `optional only` → `Optional[str] = None`
+  - `both` → `Optional[str] = None`
+  - Unresolved null fields (no types) still fall back to `Optional[Any] = None`
+- **102 tests total**, all passing (ChromeHeadless) — 12 new tests added
+- `ng build` passes cleanly ✓
+
 ---
 
 ## TODO — Next Steps
 
-### TODO-1: Nullable vs Optional distinction
+### TODO-3: Infer datetime type from ISO 8601 string fields
+
+**Problem:** Fields like `created_at: "2024-01-15T10:30:00Z"` are currently inferred as `string`. The parser has no way to distinguish a plain string from an ISO 8601 datetime. The user must manually select the `dt` type in Advanced Options.
+
+**Proposed approach:**
+
+#### A. Add datetime detection heuristic to `buildSchemaTree()`
+- When `typeof value === 'string'`, before returning `kind: 'primitive', primitiveType: 'string'`, run a regex test for ISO 8601 patterns (e.g. `/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/`)
+- If matched, set `primitiveType: 'datetime'` instead of `'string'`
+
+#### B. Update `extractAllLeafFields()` — no changes needed
+- Already returns `'datetime'` for `primitiveType: 'datetime'` nodes → will be pre-selected in Advanced Options
+
+#### C. Update tests
+- `json-parser.util.spec.ts`: add cases for ISO datetime strings → `primitiveType: 'datetime'`
+- Confirm non-datetime strings still produce `'string'`
+
+**Decisions needed:**
+- How strict should the regex be? Full ISO 8601 vs just date-only (`2024-01-15`) vs date+time only?
+- Should date-only strings (`"2024-01-15"`) also be inferred as datetime, or only full timestamps?
+
+### (All prior TODOs completed in Phase I above)
+
+---
+
+<!-- archived below for reference -->
+### TODO-1: Nullable vs Optional distinction (DONE)
 
 **Problem:** The app currently conflates two distinct concepts:
 - `error_code?: string` — the field may be absent from the object entirely (optional key)

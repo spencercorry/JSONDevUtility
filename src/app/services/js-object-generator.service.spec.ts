@@ -5,7 +5,7 @@ import { JsObjectGeneratorService } from './js-object-generator.service';
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function cfg(rootTypeName: string): GenerationConfig {
-  return { rootTypeName, pydanticVersion: 'v1', fieldMap: {} };
+  return { rootTypeName, strictMode: false, fieldMap: {} };
 }
 
 // ─── Suite ────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ describe('JsObjectGeneratorService', () => {
     // fmtValue recurses infinitely on circular refs — Angular catches it
     // via the try/catch in generate(). We simulate by spying on fmtValue indirectly.
     // Instead, pass undefined rootTypeName to trigger charAt error.
-    const brokenCfg = { rootTypeName: null as unknown as string, pydanticVersion: 'v1' as const, fieldMap: {} };
+    const brokenCfg = { rootTypeName: null as unknown as string, strictMode: false as const, fieldMap: {} };
     const out = svc.generate({}, brokenCfg);
     expect(out).toContain('// Generation error:');
   });

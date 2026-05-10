@@ -103,6 +103,7 @@ export class LeftPaneComponent {
           allLeafFields: extractAllLeafFields(tree),
           previousFieldMap: this.jsonState.generationConfig()?.fieldMap,
           previousRootTypeName: this.jsonState.generationConfig()?.rootTypeName,
+          previousStrictMode: this.jsonState.generationConfig()?.strictMode,
         },
       }
     );

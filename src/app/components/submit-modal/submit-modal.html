@@ -12,11 +12,7 @@
     </mat-form-field>
 
     <div class="toggle-row">
-      <span class="toggle-label">Pydantic Version</span>
-      <mat-button-toggle-group formControlName="pydanticVersion">
-        <mat-button-toggle value="v1">v1</mat-button-toggle>
-        <mat-button-toggle value="v2">v2</mat-button-toggle>
-      </mat-button-toggle-group>
+      <mat-checkbox [checked]="strictMode" (change)="strictMode = $event.checked">Pydantic Strict Mode</mat-checkbox>
     </div>
 
     @if (nullFields.length > 0) {
@@ -34,6 +30,8 @@
                   (click)="toggleType(path, type)">{{ TYPE_LABELS[type] }}</button>
               }
             </div>
+            <button type="button" class="opt-btn" [class.active]="isNullable(path)"
+              (click)="toggleNullable(path)">null</button>
             <button type="button" class="opt-btn" [class.active]="isOptional(path)"
               (click)="toggleOptional(path)">opt</button>
           </div>
@@ -63,6 +61,8 @@
                     (click)="toggleType(path, type)">{{ TYPE_LABELS[type] }}</button>
                 }
               </div>
+              <button type="button" class="opt-btn" [class.active]="isNullable(path)"
+                (click)="toggleNullable(path)">null</button>
               <button type="button" class="opt-btn" [class.active]="isOptional(path)"
                 (click)="toggleOptional(path)">opt</button>
             </div>
