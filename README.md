@@ -1,4 +1,4 @@
-# JSON Developer Utility
+# TypeCast
 
 A split-pane, client-side developer utility hosted on GitHub Pages. The left pane accepts raw JSON, validates it live, and formats it on demand. The right pane lazily generates TypeScript Interfaces, Pydantic Models, and raw JS Objects from a user-configured Submit modal.
 
@@ -72,17 +72,23 @@ A strict 50/50 split-pane app. No backend, no routing, one page. Left pane = JSO
 ### 3. File & Folder Structure
 
 ```
+public/
+├── favicon.ico
+└── favicon.svg                             # SVG favicon (TC monogram, dark bg)
+
 src/
 ├── app/
 │   ├── app.ts                    # Root shell, layout host
 │   ├── app.html
 │   ├── app.scss
+│   ├── app.spec.ts
 │   ├── app.config.ts             # provideAnimations, provideMonacoEditor
 │   │
 │   ├── components/
 │   │   ├── header/
-│   │   │   ├── header.component.ts
-│   │   │   └── header.component.scss
+│   │   │   ├── header.ts
+│   │   │   ├── header.html
+│   │   │   └── header.scss
 │   │   │
 │   │   ├── left-pane/
 │   │   │   ├── left-pane.component.ts
@@ -90,35 +96,40 @@ src/
 │   │   │   └── left-pane.component.scss
 │   │   │
 │   │   ├── right-pane/
-│   │   │   ├── right-pane.component.ts
-│   │   │   ├── right-pane.component.html
-│   │   │   └── right-pane.component.scss
+│   │   │   ├── right-pane.ts
+│   │   │   ├── right-pane.html
+│   │   │   └── right-pane.scss
 │   │   │
 │   │   ├── output-tab/
-│   │   │   ├── output-tab.component.ts
-│   │   │   └── output-tab.component.scss
+│   │   │   ├── output-tab.ts
+│   │   │   ├── output-tab.html
+│   │   │   └── output-tab.scss
 │   │   │
 │   │   ├── submit-modal/
-│   │   │   ├── submit-modal.component.ts
-│   │   │   ├── submit-modal.component.html
-│   │   │   └── submit-modal.component.scss
+│   │   │   ├── submit-modal.ts
+│   │   │   ├── submit-modal.html
+│   │   │   └── submit-modal.scss
 │   │   │
 │   │   └── help-modal/
-│   │       ├── help-modal.component.ts
-│   │       ├── help-modal.component.html
-│   │       └── help-modal.component.scss
+│   │       ├── help-modal.ts
+│   │       ├── help-modal.html
+│   │       └── help-modal.scss
 │   │
 │   ├── services/
-│   │   ├── json-state.service.ts           # Central signal store
+│   │   ├── json-state.service.ts                      # Central signal store
 │   │   ├── typescript-generator.service.ts
+│   │   ├── typescript-generator.service.spec.ts
 │   │   ├── pydantic-generator.service.ts
-│   │   └── js-object-generator.service.ts
+│   │   ├── pydantic-generator.service.spec.ts
+│   │   ├── js-object-generator.service.ts
+│   │   └── js-object-generator.service.spec.ts
 │   │
 │   ├── models/
 │   │   └── generation-config.model.ts      # FieldType, FieldConfig, GenerationConfig, SchemaNode, OutputCache
 │   │
 │   └── utils/
 │       ├── json-parser.util.ts             # buildSchemaTree, extractNullFields, extractAllLeafFields
+│       ├── json-parser.util.spec.ts
 │       ├── singularize.util.ts             # "users" → "User"
 │       └── monaco-theme.util.ts            # Custom utilityDark theme definition
 │
@@ -339,8 +350,10 @@ Opened via `MatDialog.open()`. Receives `SubmitModalData`; returns `GenerationCo
 
 ```typescript
 interface SubmitModalData {
-  nullFields:    string[];                    // hierarchical paths of null-typed fields
-  allLeafFields: Record<string, FieldType[]>; // all leaf paths with inferred types
+  nullFields:            string[];                    // hierarchical paths of null-typed fields
+  allLeafFields:         Record<string, FieldType[]>; // all leaf paths with inferred types
+  previousFieldMap?:     Record<string, FieldConfig>; // restored on reopen within same session
+  previousRootTypeName?: string;                      // restored on reopen
 }
 ```
 
@@ -379,14 +392,15 @@ interface SubmitModalData {
 
 **Responsibilities:**
 - Fixed bar spanning full width above both panes.
-- Left slot: placeholder branding text (name/logo TBD).
-- Right slot: Help icon button → opens `HelpModalComponent` via `MatDialog`.
+- Left slot: **TypeCast** wordmark — `Type` in italic Inter 700 (`$text-primary`), `Cast` in `$accent-primary` (violet).
+- Right slot: `?` circular stroked button → opens `HelpModalComponent` via `MatDialog`.
 
 #### 6.7 `HelpModalComponent`
 
 - Standard `MatDialog` with `panelClass: 'utility-modal'`.
-- Static content: usage instructions for the app.
-- Single **Close** button.
+- Static content: 7-step usage instructions for the app.
+- Beta warning banner at the bottom (red-accented callout) noting the app is in beta.
+- Single **Got it** button.
 
 ---
 
@@ -722,19 +736,19 @@ In `angular.json` assets array:
 
 ---
 
-### 13. Known Bugs & Planned Fixes
+### 13. Bug History
 
-#### Bug A — Root Type Name Collision
+#### Bug A — Root Type Name Collision ✓ Fixed
 
-**Symptom:** If the user enters a `rootTypeName` (e.g. `"User"`) that matches a top-level key in the JSON (e.g. `{ "User": { ... } }`), both the root interface and the nested object resolve to the same type name, producing a duplicate declaration.
+**Symptom:** If the user entered a `rootTypeName` (e.g. `"User"`) that matched a top-level key in the JSON (e.g. `{ "User": { ... } }`), both the root interface and the nested object resolved to the same type name, producing a duplicate declaration.
 
-**Fix:** In both `TypeScriptGeneratorService` and `PydanticGeneratorService`, after deriving a child object's type name, check if it collides with `rootTypeName`. If so, append `"Item"` suffix to the child name.
+**Fix:** In both `TypeScriptGeneratorService` and `PydanticGeneratorService`, after deriving a child object's type name, check if it collides with `rootTypeName`. If so, append `"Item"` suffix to the child name (e.g. `UserItem`).
 
-#### Bug B — Heterogeneous Array Union Inference
+#### Bug B — Heterogeneous Array Union Inference ✓ Fixed
 
-**Symptom:** If a JSON array contains objects with the same key but different value types across elements (e.g. `[{x: 1}, {x: "a"}]`), `mergeObjects()` takes the first non-null value and discards conflicting types, so `x` is typed as `number` only.
+**Symptom:** If a JSON array contained objects with the same key but different value types across elements (e.g. `[{x: 1}, {x: "a"}]`), `mergeObjects()` took the first non-null value and discarded conflicting types, so `x` was typed as `number` only. Also affected typed arrays inside object fields (e.g. `tags: string[]` was inferred as `unknown`).
 
-**Fix:** Update `mergeObjects()` in `json-parser.util.ts` to detect type conflicts per key and produce a `kind: 'union'` node covering all observed types.
+**Fix:** Replaced raw-value `mergeObjects()` with schema-level `mergeObjectSchemas()` in `json-parser.util.ts`. When the same key appears with conflicting types across array items, the merged node becomes `kind: 'union'` covering all observed types. Array-typed fields are bucketed separately and their item types are recursively merged.
 
 ---
 
@@ -759,15 +773,15 @@ In `angular.json` assets array:
 | 13 | Polish: transitions, disabled tab styles, copy button feedback |
 | 14 | Build config, base-href `/JSONDevUtility/`, Monaco assets, 404.html |
 
-#### Next Phases (planned)
+#### Feature Phases (complete)
 
 | Phase | Deliverable |
 |---|---|
 | A | Model types rework — `FieldType`, `FieldConfig`, updated `GenerationConfig` |
-| B | Parser util — `extractNullFields()` with hierarchical paths, new `extractAllLeafFields()`, `mergeObjects()` union fix |
-| C | Generator rework — all 3 generators consume `fieldMap`; datetime support; root collision fix |
-| D | `JsonStateService` — add `clearAll()`, pass `allLeafFields` to modal |
-| E | Submit modal rework — null fields + Advanced Options collapsible section |
-| F | Left pane — action bar rearrange, indent size toggle, Clear button |
-| G | Header + Help modal components; `AppComponent` layout to 3-row grid |
-| H | Generator unit tests — Karma/Jasmine for TS, Pydantic, JS Object generators |
+| B | Parser util — `extractNullFields()` with hierarchical paths, new `extractAllLeafFields()`, `mergeObjectSchemas()` union fix (Bug B) |
+| C | Generator rework — all 3 generators consume `fieldMap`; datetime support; root collision fix (Bug A) |
+| D | `JsonStateService` — add `clearAll()`, pass `allLeafFields` + previous config to modal |
+| E | Submit modal rework — null fields section + collapsible Advanced Options; session memory |
+| F | Left pane — action bar rearrange, reactive indent size toggle, Clear button |
+| G | Header (TypeCast wordmark) + Help modal; `AppComponent` 3-row grid layout |
+| H | Unit tests — 90 Karma/Jasmine tests across parser util and all 3 generators |
