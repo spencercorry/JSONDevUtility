@@ -7,6 +7,28 @@
 </div>
 
 <div class="actions">
-  <button mat-stroked-button (click)="beautify()">Beautify</button>
-  <button mat-flat-button [disabled]="!jsonState.isValid()" (click)="submit()">Submit</button>
+  <div class="actions-left">
+    <button mat-stroked-button (click)="beautify()">Beautify</button>
+    <div class="indent-control">
+      <span
+        class="indent-label"
+        matTooltip="Number of spaces applied when Beautify is used"
+        matTooltipPosition="above"
+      >Indent</span>
+      <mat-button-toggle-group
+        class="indent-toggle"
+        [value]="indentSize()"
+        (change)="onIndentChange($event.value)"
+      >
+        <mat-button-toggle [value]="2">2</mat-button-toggle>
+        <mat-button-toggle [value]="4">4</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+  </div>
+  <div class="actions-right">
+    @if (jsonState.generationConfig()) {
+      <button mat-stroked-button (click)="clear()">Clear</button>
+    }
+    <button mat-flat-button [disabled]="!jsonState.isValid()" (click)="submit()">Submit</button>
+  </div>
 </div>

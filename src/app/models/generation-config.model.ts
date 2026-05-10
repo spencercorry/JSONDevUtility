@@ -1,15 +1,17 @@
-export type NullType = 'string' | 'number' | 'boolean' | 'combination';
+export type FieldType = 'integer' | 'string' | 'float' | 'boolean' | 'datetime';
 export type PydanticVersion = 'v1' | 'v2';
-export type NullMode = 'global' | 'per-field';
 export type OutputTab = 'typescript' | 'pydantic' | 'jsObject';
 export type SchemaKind = 'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown';
+
+export interface FieldConfig {
+  types: FieldType[];
+  optional: boolean;
+}
 
 export interface GenerationConfig {
   rootTypeName: string;
   pydanticVersion: PydanticVersion;
-  nullMode: NullMode;
-  globalNullType: NullType;
-  perFieldNullMap: Record<string, NullType>;
+  fieldMap: Record<string, FieldConfig>;
 }
 
 export interface SchemaNode {
@@ -18,7 +20,7 @@ export interface SchemaNode {
   kind: SchemaKind;
   children: SchemaNode[];
   itemType: SchemaNode | null;
-  primitiveType?: 'string' | 'number' | 'integer' | 'float' | 'boolean';
+  primitiveType?: FieldType;
   unionMembers?: string[];
 }
 

@@ -1,4 +1,4 @@
-# JSON Developer Utility
+# TypeCast
 
 A split-pane, client-side developer utility hosted on GitHub Pages. The left pane accepts raw JSON, validates it live, and formats it on demand. The right pane lazily generates TypeScript Interfaces, Pydantic Models, and raw JS Objects from a user-configured Submit modal.
 
@@ -24,13 +24,19 @@ Open your browser at `http://localhost:4200/`. The app reloads automatically on 
 
 ## Build & Deploy
 
-Build for production:
+Build for production (repo name is `JSONDevUtility`):
 
 ```bash
-ng build --base-href /your-repo-name/
+npm run build:gh-pages
 ```
 
-Artifacts are written to `dist/`. Copy `dist/index.html` to `dist/404.html` before deploying to GitHub Pages.
+Or manually:
+
+```bash
+ng build --base-href /JSONDevUtility/
+```
+
+Then copy `dist/jsonapp/browser/index.html` → `dist/jsonapp/browser/404.html` before pushing to the `gh-pages` branch.
 
 ## Running Tests
 
@@ -52,10 +58,10 @@ A strict 50/50 split-pane app. No backend, no routing, one page. Left pane = JSO
 
 | Layer | Technology | Version Target |
 |---|---|---|
-| Framework | Angular | 20+ (standalone components, no NgModules) |
+| Framework | Angular | 21+ (standalone components, no NgModules) |
 | Reactivity | Angular Signals | Native (`signal`, `computed`, `effect`) |
 | Editor | ngx-monaco-editor-v2 | Latest |
-| UI Components | Angular Material | 19+ (MDC-based) |
+| UI Components | Angular Material | 21+ (M3 theming) |
 | Styling | Angular Material Theming + SCSS | Custom dark token set |
 | Language | TypeScript | 5.4+ |
 | Build | Angular CLI (`ng build`) | — |
@@ -66,61 +72,100 @@ A strict 50/50 split-pane app. No backend, no routing, one page. Left pane = JSO
 ### 3. File & Folder Structure
 
 ```
+public/
+├── favicon.ico
+└── favicon.svg                             # SVG favicon (TC monogram, dark bg)
+
 src/
 ├── app/
-│   ├── app.component.ts          # Root shell, layout host
+│   ├── app.ts                    # Root shell, layout host
+│   ├── app.html
+│   ├── app.scss
+│   ├── app.spec.ts
 │   ├── app.config.ts             # provideAnimations, provideMonacoEditor
 │   │
 │   ├── components/
+│   │   ├── header/
+│   │   │   ├── header.ts
+│   │   │   ├── header.html
+│   │   │   └── header.scss
+│   │   │
 │   │   ├── left-pane/
 │   │   │   ├── left-pane.component.ts
+│   │   │   ├── left-pane.component.html
 │   │   │   └── left-pane.component.scss
 │   │   │
 │   │   ├── right-pane/
-│   │   │   ├── right-pane.component.ts
-│   │   │   └── right-pane.component.scss
+│   │   │   ├── right-pane.ts
+│   │   │   ├── right-pane.html
+│   │   │   └── right-pane.scss
 │   │   │
 │   │   ├── output-tab/
-│   │   │   ├── output-tab.component.ts
-│   │   │   └── output-tab.component.scss
+│   │   │   ├── output-tab.ts
+│   │   │   ├── output-tab.html
+│   │   │   └── output-tab.scss
 │   │   │
-│   │   └── submit-modal/
-│   │       ├── submit-modal.component.ts
-│   │       └── submit-modal.component.scss
+│   │   ├── submit-modal/
+│   │   │   ├── submit-modal.ts
+│   │   │   ├── submit-modal.html
+│   │   │   └── submit-modal.scss
+│   │   │
+│   │   └── help-modal/
+│   │       ├── help-modal.ts
+│   │       ├── help-modal.html
+│   │       └── help-modal.scss
 │   │
 │   ├── services/
-│   │   ├── json-state.service.ts         # Central signal store
+│   │   ├── json-state.service.ts                      # Central signal store
 │   │   ├── typescript-generator.service.ts
+│   │   ├── typescript-generator.service.spec.ts
 │   │   ├── pydantic-generator.service.ts
-│   │   └── js-object-generator.service.ts
+│   │   ├── pydantic-generator.service.spec.ts
+│   │   ├── js-object-generator.service.ts
+│   │   └── js-object-generator.service.spec.ts
 │   │
 │   ├── models/
-│   │   └── generation-config.model.ts    # Interfaces for modal output
+│   │   └── generation-config.model.ts      # FieldType, FieldConfig, GenerationConfig, SchemaNode, OutputCache
 │   │
 │   └── utils/
-│       ├── json-parser.util.ts           # Parse + extract schema tree
-│       ├── singularize.util.ts           # "users" → "User"
-│       └── monaco-theme.util.ts          # Custom theme definition
+│       ├── json-parser.util.ts             # buildSchemaTree, extractNullFields, extractAllLeafFields
+│       ├── json-parser.util.spec.ts
+│       ├── singularize.util.ts             # "users" → "User"
+│       └── monaco-theme.util.ts            # Custom utilityDark theme definition
 │
 ├── styles/
-│   ├── _theme.scss                       # Angular Material custom theme
-│   ├── _variables.scss                   # SCSS design tokens
-│   └── styles.scss                       # Global styles
+│   ├── _variables.scss                     # SCSS design tokens
+│   └── styles.scss                         # Global styles + M3 theme + dialog override
 ```
 
 ---
 
 ### 4. Data Models
 
+#### `FieldType`
+
+```
+type FieldType = 'integer' | 'string' | 'float' | 'boolean' | 'datetime'
+```
+
+#### `FieldConfig`
+
+```
+FieldConfig {
+  types:    FieldType[]   // multi-select; empty array = unresolved null field (user must fill)
+  optional: boolean       // TS: key?:type  |  Pydantic: Optional[T] = None
+}
+```
+
 #### `GenerationConfig`
 
 ```
 GenerationConfig {
-  rootTypeName:      string
-  pydanticVersion:   'v1' | 'v2'
-  nullMode:          'global' | 'per-field'
-  globalNullType:    'string' | 'number' | 'boolean' | 'combination'  // if nullMode = global
-  perFieldNullMap:   Record<string, 'string' | 'number' | 'boolean' | 'combination'>  // if nullMode = per-field
+  rootTypeName:    string
+  pydanticVersion: 'v1' | 'v2'
+  fieldMap:        Record<string, FieldConfig>
+  // Keys are full hierarchical dot-paths, e.g. "user.profile.age"
+  // Covers both null fields (required, empty types[]) and leaf overrides (from Advanced Options)
 }
 ```
 
@@ -128,11 +173,12 @@ GenerationConfig {
 
 ```
 SchemaNode {
-  key:        string
-  typeName:   string                  // resolved interface/class name
-  kind:       'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown'
-  children:   SchemaNode[]            // populated for kind = 'object'
-  itemType:   SchemaNode | null       // populated for kind = 'array'
+  key:      string
+  typeName: string                  // resolved interface/class name
+  kind:     'primitive' | 'object' | 'array' | 'null' | 'union' | 'unknown'
+  children: SchemaNode[]            // populated for kind = 'object'
+  itemType: SchemaNode | null       // populated for kind = 'array'
+  unionMembers: string[]            // populated for kind = 'union' (e.g. ['integer','string'])
 }
 ```
 
@@ -140,9 +186,9 @@ SchemaNode {
 
 ```
 OutputCache {
-  typescript:   string | null
-  pydantic:     string | null
-  jsObject:     string | null
+  typescript: string | null
+  pydantic:   string | null
+  jsObject:   string | null
 }
 ```
 
@@ -153,46 +199,49 @@ OutputCache {
 All application state lives in `JsonStateService`. Components read signals; only `JsonStateService` writes them.
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  JsonStateService                   │
-│                                                     │
-│  WRITABLE SIGNALS                                   │
-│  ─────────────────────────────────────────────────  │
-│  rawJson          = signal<string>('')              │
-│  generationConfig = signal<GenerationConfig | null> │
-│  activeTab        = signal<'ts'|'pydantic'|'js'>    │
-│  outputCache      = signal<OutputCache>             │
-│                                                     │
-│  COMPUTED SIGNALS                                   │
-│  ─────────────────────────────────────────────────  │
-│  parseResult = computed(() => {                     │
-│    try { return { ok: true, value: JSON.parse() }   │
-│    catch { return { ok: false, error: string } }    │
-│  })                                                 │
-│                                                     │
-│  isValid  = computed(() => parseResult().ok)        │
-│  errorMsg = computed(() => parseResult().error)     │
-│                                                     │
-│  schemaTree = computed(() =>                        │
-│    isValid() ? buildSchemaTree(parseResult().value) │
-│              : null                                 │
-│  )                                                  │
-└─────────────────────────────────────────────────────┘
-         │
-         │ injected into
-         ▼
-┌──────────────────┐    ┌───────────────────────────────┐
-│  LeftPane        │    │  RightPane                    │
-│                  │    │                               │
-│  reads:          │    │  reads:                       │
-│  - rawJson       │    │  - isValid                    │
-│  - isValid       │    │  - errorMsg                   │
-│                  │    │  - activeTab                  │
-│  writes:         │    │  - outputCache                │
-│  - rawJson       │    │                               │
-│  (on editor      │    │  writes:                      │
-│   change)        │    │  - activeTab (on tab click)   │
-└──────────────────┘    └───────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│                   JsonStateService                     │
+│                                                        │
+│  WRITABLE SIGNALS                                      │
+│  ──────────────────────────────────────────────────    │
+│  rawJson          = signal<string>('')                 │
+│  generationConfig = signal<GenerationConfig | null>    │
+│  activeTab        = signal<'typescript'|'pydantic'|    │
+│                            'jsObject'>                 │
+│  outputCache      = signal<OutputCache>                │
+│                                                        │
+│  COMPUTED SIGNALS                                      │
+│  ──────────────────────────────────────────────────    │
+│  parseResult = computed(() => {                        │
+│    try { return { ok: true, value: JSON.parse() }      │
+│    catch { return { ok: false, error: string } }       │
+│  })                                                    │
+│                                                        │
+│  isValid  = computed(() => parseResult().ok)           │
+│  errorMsg = computed(() => parseResult().error)        │
+│                                                        │
+│  schemaTreePreview = computed(() =>                    │
+│    isValid() ? buildSchemaTree(parseResult().value)    │
+│              : null                                    │
+│  )                                                     │
+│  // Config-independent; used for null field extraction │
+│  // and allLeafFields extraction before Submit         │
+│                                                        │
+│  schemaTree = computed(() =>                           │
+│    isValid() && generationConfig()                     │
+│      ? buildSchemaTree(parseResult().value)            │
+│      : null                                            │
+│  )                                                     │
+│  // Config-dependent; used inside effect() generation  │
+│                                                        │
+│  PUBLIC METHODS                                        │
+│  ──────────────────────────────────────────────────    │
+│  applyConfig(config): resets outputCache → all null,  │
+│                       sets generationConfig            │
+│  clearAll():          resets rawJson(''),              │
+│                       generationConfig(null),          │
+│                       outputCache({ all: null })       │
+└────────────────────────────────────────────────────────┘
 ```
 
 #### Lazy Output Resolution via `effect()`
@@ -205,7 +254,7 @@ effect(() => {
   const cache = outputCache();
 
   if (!tree || !cfg) return;
-  if (cache[tab] !== null) return;   // already computed, skip
+  if (cache[tab] !== null) return;   // cache hit — skip
 
   const result = generateForTab(tab, tree, cfg);
   outputCache.update(c => ({ ...c, [tab]: result }));
@@ -214,14 +263,20 @@ effect(() => {
 
 #### Cache Invalidation
 
-When the user clicks **Submit** and confirms the modal, `JsonStateService.applyConfig(config)` runs:
+When the user confirms Submit, `applyConfig(config)` runs:
 
 ```
 outputCache.set({ typescript: null, pydantic: null, jsObject: null });
 generationConfig.set(config);
 ```
 
-This nulls the cache, which causes the `effect()` to re-generate for the active tab on next evaluation.
+When the user clicks Clear, `clearAll()` runs:
+
+```
+rawJson.set('');
+generationConfig.set(null);
+outputCache.set({ typescript: null, pydantic: null, jsObject: null });
+```
 
 ---
 
@@ -229,44 +284,55 @@ This nulls the cache, which causes the `effect()` to re-generate for the active 
 
 #### 6.1 `AppComponent`
 
-- Root shell only. Owns the two-column 50/50 CSS Grid layout.
-- Imports `LeftPaneComponent` and `RightPaneComponent`.
-- No business logic.
+Root shell. Owns the full-page layout via CSS Grid.
 
 ```
 layout:
-┌─────────────────────┬─────────────────────┐
-│    LeftPane 50%     │    RightPane 50%     │
-└─────────────────────┴─────────────────────┘
+┌───────────────────────────────────────┐  ← HeaderComponent (fixed height)
+├─────────────────────┬─────────────────┤
+│    LeftPane 50%     │   RightPane 50% │  ← fills remaining viewport height
+└─────────────────────┴─────────────────┘
 ```
+
+Imports `HeaderComponent`, `LeftPaneComponent`, `RightPaneComponent`. No business logic.
 
 #### 6.2 `LeftPaneComponent`
 
 **Responsibilities:**
 - Hosts the left Monaco editor (JSON language mode, custom dark theme).
-- Wires `ngx-monaco-editor` `valueChange` → `jsonStateService.rawJson.set()`.
-- Wires Monaco's `onInit` to register custom dark theme and set JSON diagnostics (validation markers) on.
-- **Beautify button**: calls `JSON.parse()` + `JSON.stringify(val, null, 2)` and sets result back into the editor model. Shows snackbar if invalid.
-- **Submit button**: disabled when `!isValid()`. Opens `SubmitModalComponent` via `MatDialog`. On close with a `GenerationConfig` result, calls `jsonStateService.applyConfig()`.
+- Wires `onDidChangeModelContent` → `jsonState.rawJson.set()`.
+- Registers custom `utilityDark` theme on editor `onInit`.
+
+**Action bar layout:**
+
+```
+[ Beautify ]  [ 2 | 4 ]  ·····················  [ Clear ]  [ Submit ]
+  ↑ stroked    ↑ indent                           ↑ warn     ↑ flat primary
+  left                                            right (post-Submit only)
+```
+
+- **Beautify**: parses + re-formats JSON using the current indent size. Shows snackbar on invalid JSON.
+- **Indent size toggle**: `[2 | 4]` button group (local signal, default 2). Consumed by `beautify()`.
+- **Submit**: disabled when `!isValid()`. Opens `SubmitModalComponent` via `MatDialog`. On close with a config, calls `jsonState.applyConfig(config)`.
+- **Clear**: only visible when `jsonState.generationConfig()` is non-null. Calls `jsonState.clearAll()`, which empties the editor.
 
 #### 6.3 `RightPaneComponent`
 
 **Responsibilities:**
 - Hosts `MatTabGroup` with three tabs: **TypeScript**, **Pydantic**, **JS Object**.
 - Binds `[disabled]="!isValid()"` to each `MatTab`.
-- Applies a greyed-out CSS class to tab labels when `!isValid()`.
-- When `isValid()` is false, shows an error panel inside the tab body:
+- Applies reduced-opacity + `cursor: not-allowed` CSS to disabled tab labels.
+- Shows error panel inside tab body when `!isValid()`:
 
 ```
-┌─────────────────────────────────┐
-│  ⚠ JSON Parse Error             │
-│  Line 4, Col 12: Unexpected     │
-│  token '}'                      │
-└─────────────────────────────────┘
+┌───────────────────────────────────┐
+│  ⚠ JSON Parse Error               │
+│  Line 4, Col 12: Unexpected '}'   │
+└───────────────────────────────────┘
 ```
 
-- On `(selectedTabChange)`, calls `jsonStateService.activeTab.set(tab)`.
-- When `isValid()` is true, renders `OutputTabComponent` inside each tab.
+- On `(selectedTabChange)` → `jsonState.activeTab.set(tab)`.
+- When valid, renders `OutputTabComponent` inside each tab.
 
 #### 6.4 `OutputTabComponent`
 
@@ -274,79 +340,102 @@ layout:
 
 **Responsibilities:**
 - Hosts a **read-only** Monaco editor displaying the generated code.
-- Shows a skeleton/spinner when `content()` is `null` (generating).
-- **Copy to Clipboard** button (top-right corner) uses `navigator.clipboard.writeText(content())`. Briefly shows a checkmark on success.
+- Shows empty-state prompt when `content()` is `null` (not yet generated).
+- **Copy to Clipboard** button (top-right) uses `navigator.clipboard.writeText(content())`. Shows a checkmark icon for 2s on success.
 - Language modes: `typescript`, `python`, `javascript`.
 
 #### 6.5 `SubmitModalComponent`
 
-Opened via `MatDialog.open()`. Returns a `GenerationConfig` or `undefined` (dismissed).
+Opened via `MatDialog.open()`. Receives `SubmitModalData`; returns `GenerationConfig | undefined`.
+
+```typescript
+interface SubmitModalData {
+  nullFields:            string[];                    // hierarchical paths of null-typed fields
+  allLeafFields:         Record<string, FieldType[]>; // all leaf paths with inferred types
+  previousFieldMap?:     Record<string, FieldConfig>; // restored on reopen within same session
+  previousRootTypeName?: string;                      // restored on reopen
+}
+```
 
 **Form layout:**
 
 ```
-┌──────────────────────────────────────────────┐
-│  Configure Generation                        │
-├──────────────────────────────────────────────┤
-│  Root Type Name  [ MyRootType         ]      │
-│                                              │
-│  Pydantic Version  ○ v1   ● v2              │
-│                                              │
-│  Null Value Handling                         │
-│  ┌──────────────────────────────────────┐   │
-│  │  Mode:  [Global ▼]  [Per-field ▼]   │   │
-│  └──────────────────────────────────────┘   │
-│                                              │
-│  — if Global ————————————————————————————   │
-│  Treat nulls as: [string | null  ▼]         │
-│                                              │
-│  — if Per-field ──────────────────────────  │
-│  email (null)   [string | null  ▼]          │
-│  score (null)   [number | null  ▼]          │
-│  ...                                        │
-├──────────────────────────────────────────────┤
-│                    [Cancel]  [Generate →]    │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  Configure Output                                    │
+├──────────────────────────────────────────────────────┤
+│  Root Type Name   [________________________]         │
+│                                                      │
+│  Pydantic Version   [ v1 ]  [ v2 ]                  │
+│                                                      │
+│  ── Null Fields (required) ──────────────────────   │
+│  user.score   [int][str][flt][bool][dt]   □ Optional │
+│  meta.tag     [int][str][flt][bool][dt]   □ Optional │
+│  ...                                                 │
+│                                                      │
+│  ▶ Advanced Options  ────────────────────────────   │
+│    (collapsed by default — click to expand)          │
+│    user.id    [int][str][flt][bool][dt]   □ Optional │
+│    user.name  [int][str][flt][bool][dt]   □ Optional │
+│    ...                                               │
+├──────────────────────────────────────────────────────┤
+│                              [Cancel]  [Generate →]  │
+└──────────────────────────────────────────────────────┘
 ```
 
-**Per-field population:** The modal receives the `SchemaNode` tree as `data` via `MAT_DIALOG_DATA`. It filters all nodes where `kind === 'null'` to build the per-field form array.
+**Behaviour:**
+- Null fields section is always visible; each row uses multi-select toggle buttons — the user must select ≥1 type per null field before Generate is enabled.
+- Advanced Options is a collapsible panel showing every leaf node. Buttons are pre-selected to the inferred type(s). The user may add/remove types (union building) and toggle the Optional checkbox.
+- The Optional checkbox on a field maps to `FieldConfig.optional = true`.
+- On confirm, the modal assembles a `GenerationConfig` from the form state and closes.
+
+#### 6.6 `HeaderComponent`
+
+**Responsibilities:**
+- Fixed bar spanning full width above both panes.
+- Left slot: **TypeCast** wordmark — `Type` in italic Inter 700 (`$text-primary`), `Cast` in `$accent-primary` (violet).
+- Right slot: `?` circular stroked button → opens `HelpModalComponent` via `MatDialog`.
+
+#### 6.7 `HelpModalComponent`
+
+- Standard `MatDialog` with `panelClass: 'utility-modal'`.
+- Static content: 7-step usage instructions for the app.
+- Beta warning banner at the bottom (red-accented callout) noting the app is in beta.
+- Single **Got it** button.
 
 ---
 
 ### 7. Service Layer — Code Generators
 
-All three generator services are pure, stateless, and injectable. They accept a `SchemaNode` tree and a `GenerationConfig` and return a formatted string.
+#### 7.1 `JsonParserUtil` (`json-parser.util.ts`)
 
-#### 7.1 `JsonParserUtil.buildSchemaTree(value, key, config)`
-
-Central recursive function that converts a parsed JSON value into a `SchemaNode` tree.
-
-**Algorithm:**
+**`buildSchemaTree(value, key, path?)`** — recursive; converts parsed JSON into a `SchemaNode` tree.
 
 ```
-buildSchemaTree(value, key):
-  if value === null       → { kind: 'null', resolvedType: from config }
-  if typeof === 'string'  → { kind: 'primitive', typeName: 'string' }
-  if typeof === 'number'  → { kind: 'primitive', typeName: 'number' }
-  if typeof === 'boolean' → { kind: 'primitive', typeName: 'boolean' }
+buildSchemaTree(value, key, path):
+  if value === null         → { kind: 'null' }
+  if typeof === 'boolean'   → { kind: 'primitive', typeName: 'boolean' }
+  if typeof === 'number':
+    Number.isInteger(value) → typeName: 'integer'
+    else                    → typeName: 'float'
+  if typeof === 'string'    → { kind: 'primitive', typeName: 'string' }
   if Array.isArray:
-    if empty              → { kind: 'array', itemType: 'unknown' }
-    collect unique kinds from all items
-    if all items are objects:
-      itemTypeName = singularize(PascalCase(key))
-      → { kind: 'array', itemType: buildSchemaTree(items[0], itemTypeName) }
-    if items are mixed primitives:
-      → { kind: 'union', members: [...unique primitives] }
-    else:
-      → { kind: 'unknown' }
+    if empty                → { kind: 'array', itemType: unknown }
+    collect shallow types from all items
+    if all objects          → merge via mergeObjects() → single object itemType
+    if mixed primitives     → { kind: 'union', unionMembers: [...unique types] }
+    if mixed (obj+prim)     → { kind: 'unknown' }
   if typeof === 'object':
-    children = Object.entries(value).map(([k,v]) => buildSchemaTree(v, k))
+    children = entries.map(([k,v]) => buildSchemaTree(v, k, path + '.' + k))
     → { kind: 'object', typeName: PascalCase(key), children }
 ```
 
-**Deduplication:** Before generating code, the tree is flattened into a `Map<typeName, SchemaNode>` to prevent duplicate interface declarations.
+**`mergeObjects(items)`** — merges an array of objects into a single representative object for schema inference. When the same key appears with different types across items, the result node becomes `kind: 'union'` covering all observed types.
 
-#### 7.2 `SingularizeUtil`
+**`extractNullFields(tree, prefix?)`** — returns `string[]` of full hierarchical dot-paths for all nodes where `kind === 'null'` (e.g. `"user.profile.age"`).
+
+**`extractAllLeafFields(tree, prefix?)`** — returns `Record<string, FieldType[]>` mapping every leaf node's dot-path to its inferred type(s). null nodes map to `[]`; union nodes map to their `unionMembers`; primitives map to their single `typeName` cast to `FieldType`.
+
+#### 7.2 `SingularizeUtil` (`singularize.util.ts`)
 
 ```
 -ies → -y    (categories → Category)
@@ -357,16 +446,23 @@ fallback:    append 'Item' (data → DataItem)
 
 #### 7.3 `TypeScriptGeneratorService`
 
-One `export interface` block per unique object node. Root uses `rootTypeName`. Nested interfaces use `PascalCase(key)`. All fields are required.
+One `export interface` block per unique object node. Root uses `rootTypeName`. Nested interfaces use `PascalCase(key)`.
 
-**Null type mapping:**
+**Type mapping:**
 
-| Config Value | TypeScript Type |
+| FieldType | TypeScript output |
 |---|---|
-| `'string'` | `string \| null` |
-| `'number'` | `number \| null` |
-| `'boolean'` | `boolean \| null` |
-| `'combination'` | `string \| number \| boolean \| null` |
+| `integer` | `number` |
+| `float` | `number` |
+| `boolean` | `boolean` |
+| `string` | `string` |
+| `datetime` | `string` |
+| union of N types | `T1 \| T2 \| ...` |
+| optional flag | `key?: type` (instead of `key: type`) |
+
+**`fieldMap` lookup:** When generating a field, look up its full dot-path in `config.fieldMap`. If found, use `FieldConfig.types` to build the type string and apply the optional flag. If not found, use the inferred type from the `SchemaNode`.
+
+**Root name collision guard:** If a child object node resolves to the same type name as `rootTypeName`, append `"Item"` suffix to the child's name (e.g. `UserItem`) to prevent duplicate interface declarations.
 
 **Sample output:**
 
@@ -378,7 +474,8 @@ export interface Address {
 
 export interface User {
   id: number;
-  email: string | null;
+  email?: string;
+  score: number | string;
   address: Address;
   tags: string[];
 }
@@ -391,10 +488,29 @@ export interface Root {
 
 #### 7.4 `PydanticGeneratorService`
 
-**v1 output:**
+Classes emitted in dependency-first order (children before parents). Only used `typing` imports are included.
+
+**Type mapping:**
+
+| FieldType | Python output |
+|---|---|
+| `integer` | `int` |
+| `float` | `float` |
+| `boolean` | `bool` |
+| `string` | `str` |
+| `datetime` | `datetime` (adds `from datetime import datetime`) |
+| union of N types | `Union[T1, T2, ...]` |
+| optional flag | `Optional[T] = None` |
+
+**`fieldMap` lookup:** Same dot-path lookup as TypeScript generator. Optional flag → `Optional[T] = None`.
+
+**Root name collision guard:** Same suffix rule as TypeScript generator.
+
+**v1 sample output:**
 
 ```python
-from typing import Optional, List, Union, Any
+from datetime import datetime
+from typing import Optional, List, Union
 from pydantic import BaseModel
 
 class Address(BaseModel):
@@ -403,38 +519,21 @@ class Address(BaseModel):
 
 class User(BaseModel):
     id: int
-    email: Optional[str]
+    email: Optional[str] = None
+    score: Union[int, str]
     address: Address
     tags: List[str]
+
+class Root(BaseModel):
+    users: List[User]
+    count: int
 ```
 
-**v2 output:**
-
-```python
-from typing import Optional, List, Union, Any
-from pydantic import BaseModel, ConfigDict
-
-class Address(BaseModel):
-    model_config = ConfigDict(strict=True)
-    city: str
-    zip: str
-```
-
-**Type mapping:**
-
-| JSON | Python |
-|---|---|
-| `string` | `str` |
-| `number` (integer) | `int` |
-| `number` (float) | `float` |
-| `boolean` | `bool` |
-| `null` | `Optional[X]` |
-| mixed union | `Union[str, int, bool]` |
-| unknown | `Any` |
+**v2 adds** `model_config = ConfigDict(strict=True)` to each class.
 
 #### 7.5 `JsObjectGeneratorService`
 
-Produces a `const data = { ... }` literal. Keys are unquoted where they are valid JS identifiers (`/^[a-zA-Z_$][a-zA-Z0-9_$]*$/`). String values use single quotes.
+Produces a `const data = { ... }` literal from the raw parsed value. Unquoted keys for valid JS identifiers. Single-quoted strings. Does not use `fieldMap` — purely structural.
 
 ```javascript
 const data = {
@@ -457,7 +556,7 @@ const data = {
 
 ```
 provideMonacoEditor({
-  baseUrl: 'assets',
+  baseUrl: 'assets/vs',
   defaultOptions: {
     scrollBeyondLastLine: false,
     minimap: { enabled: false },
@@ -492,7 +591,7 @@ folding: true
 
 #### 8.4 Custom Monaco Theme — `utilityDark`
 
-Registered via `monaco.editor.defineTheme('utilityDark', ...)` to match the Angular Material dark palette.
+Registered via `monaco.editor.defineTheme('utilityDark', ...)` on editor `onInit`.
 
 | Token | Color |
 |---|---|
@@ -511,27 +610,9 @@ Registered via `monaco.editor.defineTheme('utilityDark', ...)` to match the Angu
 
 ### 9. Angular Material Theme
 
-#### 9.1 Custom Theme (`_theme.scss`)
+M3 API exclusively via `mat.theme()` in `src/styles.scss`. Do **not** use M2 APIs (`mat.define-palette`, `mat.define-dark-theme`).
 
-```scss
-@use '@angular/material' as mat;
-
-$primary:   mat.define-palette(mat.$indigo-palette, 400, 200, 600);
-$accent:    mat.define-palette(mat.$cyan-palette, 400);
-$warn:      mat.define-palette(mat.$red-palette, 400);
-
-$theme: mat.define-dark-theme((
-  color: (primary: $primary, accent: $accent, warn: $warn),
-  typography: mat.define-typography-config(
-    $font-family: "'Inter', sans-serif"
-  ),
-  density: -1
-));
-
-@include mat.all-component-themes($theme);
-```
-
-#### 9.2 Design Tokens (`_variables.scss`)
+#### 9.1 Design Tokens (`_variables.scss`)
 
 ```scss
 $surface-base:    #0f1117;
@@ -545,11 +626,12 @@ $accent-success:  #80cfa9;
 $accent-error:    #fc8181;
 ```
 
-#### 9.3 Component Overrides
+#### 9.2 Component Overrides
 
 - **`MatTab` disabled state**: opacity `0.35`, cursor `not-allowed`.
 - **`MatDialog`**: `panelClass: 'utility-modal'` — `border: 1px solid $border-subtle`, `border-radius: 12px`, `background: $surface-raised`.
-- **Buttons**: `border-radius: 6px`. Beautify = `mat-stroked-button`. Submit = `mat-flat-button` primary.
+- **Buttons**: `border-radius: 6px`. Beautify = `mat-stroked-button`. Submit = `mat-flat-button` primary. Clear = `mat-stroked-button` warn.
+- **Type toggle buttons** (in modal): `MatButtonToggleGroup`, multi-select, compact size.
 - **Copy button**: `mat-icon-button` positioned `absolute; top: 8px; right: 8px`.
 
 ---
@@ -588,32 +670,41 @@ schemaTree populated            errorMsg set
 ### 11. CSS Grid Layout Spec
 
 ```scss
-// app.component.scss
+// app.scss
 :host {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 100vh;
+  grid-template-rows: auto 1fr;   // header + pane row
+  grid-template-columns: 1fr 1fr; // 50/50 split
+  height: 100vh;
   overflow: hidden;
   background: $surface-base;
 }
 
+.app-header {
+  grid-column: 1 / -1;            // spans full width
+  border-bottom: 1px solid $border-subtle;
+}
+
+// Left pane internal layout
 .left-pane {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto;   // editor + action bar
   border-right: 1px solid $border-subtle;
 }
 
 .left-pane__actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid $border-subtle;
   background: $surface-raised;
-}
 
-.right-pane {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  .actions-right {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
 }
 ```
 
@@ -621,21 +712,19 @@ schemaTree populated            errorMsg set
 
 ### 12. Build & Deployment Notes
 
-#### 12.1 GitHub Pages Base Href
+#### 12.1 GitHub Pages
+
+Repo: `JSONDevUtility`. Build script in `package.json`:
 
 ```bash
-ng build --base-href /your-repo-name/
+npm run build:gh-pages
 ```
 
-Or set permanently in `angular.json`:
-
-```json
-"baseHref": "/your-repo-name/"
-```
+This runs `ng build --base-href /JSONDevUtility/` and copies `index.html` → `404.html`.
 
 #### 12.2 Monaco Assets
 
-Add to `angular.json` `assets` array:
+In `angular.json` assets array:
 
 ```json
 {
@@ -645,13 +734,27 @@ Add to `angular.json` `assets` array:
 }
 ```
 
-#### 12.3 404 Handling
+---
 
-Copy `dist/index.html` → `dist/404.html` before deploying.
+### 13. Bug History
+
+#### Bug A — Root Type Name Collision ✓ Fixed
+
+**Symptom:** If the user entered a `rootTypeName` (e.g. `"User"`) that matched a top-level key in the JSON (e.g. `{ "User": { ... } }`), both the root interface and the nested object resolved to the same type name, producing a duplicate declaration.
+
+**Fix:** In both `TypeScriptGeneratorService` and `PydanticGeneratorService`, after deriving a child object's type name, check if it collides with `rootTypeName`. If so, append `"Item"` suffix to the child name (e.g. `UserItem`).
+
+#### Bug B — Heterogeneous Array Union Inference ✓ Fixed
+
+**Symptom:** If a JSON array contained objects with the same key but different value types across elements (e.g. `[{x: 1}, {x: "a"}]`), `mergeObjects()` took the first non-null value and discarded conflicting types, so `x` was typed as `number` only. Also affected typed arrays inside object fields (e.g. `tags: string[]` was inferred as `unknown`).
+
+**Fix:** Replaced raw-value `mergeObjects()` with schema-level `mergeObjectSchemas()` in `json-parser.util.ts`. When the same key appears with conflicting types across array items, the merged node becomes `kind: 'union'` covering all observed types. Array-typed fields are bucketed separately and their item types are recursively merged.
 
 ---
 
-### 13. Implementation Sequence
+### 14. Implementation Sequence
+
+#### Original Phases (complete)
 
 | Phase | Deliverable |
 |---|---|
@@ -668,4 +771,17 @@ Copy `dist/index.html` → `dist/404.html` before deploying.
 | 11 | Wire Submit button → modal → `applyConfig()` → lazy effect |
 | 12 | Beautify button + snackbar error handling |
 | 13 | Polish: transitions, disabled tab styles, copy button feedback |
-| 14 | Build config, base-href, Monaco assets, 404.html |
+| 14 | Build config, base-href `/JSONDevUtility/`, Monaco assets, 404.html |
+
+#### Feature Phases (complete)
+
+| Phase | Deliverable |
+|---|---|
+| A | Model types rework — `FieldType`, `FieldConfig`, updated `GenerationConfig` |
+| B | Parser util — `extractNullFields()` with hierarchical paths, new `extractAllLeafFields()`, `mergeObjectSchemas()` union fix (Bug B) |
+| C | Generator rework — all 3 generators consume `fieldMap`; datetime support; root collision fix (Bug A) |
+| D | `JsonStateService` — add `clearAll()`, pass `allLeafFields` + previous config to modal |
+| E | Submit modal rework — null fields section + collapsible Advanced Options; session memory |
+| F | Left pane — action bar rearrange, reactive indent size toggle, Clear button |
+| G | Header (TypeCast wordmark) + Help modal; `AppComponent` 3-row grid layout |
+| H | Unit tests — 90 Karma/Jasmine tests across parser util and all 3 generators |

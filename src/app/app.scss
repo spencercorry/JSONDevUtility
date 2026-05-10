@@ -2,7 +2,12 @@
 
 :host {
   display: grid;
+  grid-template-rows: auto 1fr;
   grid-template-columns: 1fr 1fr;
   height: 100vh;
   overflow: hidden;
+}
+
+app-header {
+  grid-column: 1 / -1;
 }

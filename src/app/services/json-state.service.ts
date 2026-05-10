@@ -75,6 +75,12 @@ export class JsonStateService {
     this.generationConfig.set(config);
   }
 
+  clearAll(): void {
+    this.rawJson.set('');
+    this.generationConfig.set(null);
+    this.outputCache.set({ typescript: null, pydantic: null, jsObject: null });
+  }
+
   private generate(tab: OutputTab, tree: SchemaNode, value: unknown, config: GenerationConfig): string {
     switch (tab) {
       case 'typescript': return this.tsGenerator.generate(tree, config);

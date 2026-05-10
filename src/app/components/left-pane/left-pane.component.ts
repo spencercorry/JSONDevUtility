@@ -1,17 +1,19 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MonacoEditorModule } from 'ngx-monaco-editor-v2';
 import { GenerationConfig } from '../../models/generation-config.model';
 import { JsonStateService } from '../../services/json-state.service';
-import { extractNullFields } from '../../utils/json-parser.util';
+import { extractAllLeafFields, extractNullFields } from '../../utils/json-parser.util';
 import { registerUtilityDarkTheme } from '../../utils/monaco-theme.util';
 import { SubmitModalComponent, SubmitModalData } from '../submit-modal/submit-modal';
 
 @Component({
   selector: 'app-left-pane',
-  imports: [MatButtonModule, MonacoEditorModule],
+  imports: [MatButtonModule, MatButtonToggleModule, MatTooltipModule, MonacoEditorModule],
   templateUrl: './left-pane.component.html',
   styleUrl: './left-pane.component.scss',
 })
@@ -19,6 +21,7 @@ export class LeftPaneComponent {
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
   protected readonly jsonState = inject(JsonStateService);
+  protected readonly indentSize = signal<2 | 4>(2);
   private editorRef: any = null;
 
   protected readonly editorOptions = {
@@ -62,7 +65,7 @@ export class LeftPaneComponent {
 
   protected beautify(): void {
     try {
-      const formatted = JSON.stringify(JSON.parse(this.jsonState.rawJson()), null, 2);
+      const formatted = JSON.stringify(JSON.parse(this.jsonState.rawJson()), null, this.indentSize());
       this.jsonState.rawJson.set(formatted);
     } catch {
       this.snackBar.open('Cannot beautify — fix JSON errors first.', '✕', {
@@ -73,13 +76,35 @@ export class LeftPaneComponent {
     }
   }
 
+  protected onIndentChange(size: 2 | 4): void {
+    this.indentSize.set(size);
+    if (this.jsonState.isValid()) {
+      const formatted = JSON.stringify(JSON.parse(this.jsonState.rawJson()), null, size);
+      this.jsonState.rawJson.set(formatted);
+    }
+  }
+
+  protected clear(): void {
+    this.jsonState.clearAll();
+  }
+
   protected submit(): void {
     const tree = this.jsonState.schemaTreePreview();
     if (!tree) return;
 
     const ref = this.dialog.open<SubmitModalComponent, SubmitModalData, GenerationConfig | undefined>(
       SubmitModalComponent,
-      { panelClass: 'utility-modal', data: { nullFields: extractNullFields(tree) } }
+      {
+        panelClass: 'utility-modal',
+        width: '820px',
+        maxWidth: '95vw',
+        data: {
+          nullFields: extractNullFields(tree),
+          allLeafFields: extractAllLeafFields(tree),
+          previousFieldMap: this.jsonState.generationConfig()?.fieldMap,
+          previousRootTypeName: this.jsonState.generationConfig()?.rootTypeName,
+        },
+      }
     );
 
     ref.afterClosed().subscribe(config => {
